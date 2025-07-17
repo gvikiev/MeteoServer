@@ -20,6 +20,7 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen();
 
+
 var app = builder.Build();
 
 //Check if DB exist and run migration
