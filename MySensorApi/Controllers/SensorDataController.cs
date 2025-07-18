@@ -21,6 +21,10 @@ namespace MySensorApi.Controllers
         {
             _context.SensorData.Add(data);
             await _context.SaveChangesAsync();
+
+            await _context.Database.ExecuteSqlRawAsync("EXEC GenerateComfortRecommendations");
+            Console.WriteLine("Процедура викликана...");
+
             return Ok(new { message = "Дані збережено!" });
         }
 

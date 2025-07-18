@@ -5,10 +5,10 @@ using MySensorApi.Data; // заміни на свій простір імен, �
 var builder = WebApplication.CreateBuilder(args);
 
 //// Налаштування Kestrel для HTTP (порт 80)
-//builder.WebHost.ConfigureKestrel(options =>
-//{
-//    options.ListenAnyIP(80); // HTTP порт
-//});
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(80); // HTTP порт
+});
 
 // Додаємо сервіси
 builder.Services.AddControllers();
