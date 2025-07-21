@@ -9,6 +9,8 @@ namespace MySensorApi.Data
         public AppDbContext(DbContextOptions<AppDbContext> options)
             : base(options) { }
 
+        public DbSet<ComfortRecommendation> ComfortRecommendations { get; set; }
+
         public DbSet<SensorData> SensorData { get; set; }
     }
 }

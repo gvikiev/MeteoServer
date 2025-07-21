@@ -1,14 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.OpenApi.Models;
 using MySensorApi.Data; // заміни на свій простір імен, якщо інший
 
 var builder = WebApplication.CreateBuilder(args);
-
-////// Налаштування Kestrel для HTTP (порт 80)
-//builder.WebHost.ConfigureKestrel(options =>
-//{
-//    options.ListenAnyIP(80); // HTTP порт
-//});
 
 // Додаємо сервіси
 builder.Services.AddControllers();
@@ -20,6 +15,15 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin() // або вкажи IP мобільного
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
@@ -33,13 +37,23 @@ if(app.Environment.IsDevelopment())
     }
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
 // Middleware
 app.UseSwagger();
 
 app.UseSwaggerUI();
+
+app.UseCors();
 
 app.UseAuthorization();
 
 app.MapControllers();
 
 app.Run();
+
+

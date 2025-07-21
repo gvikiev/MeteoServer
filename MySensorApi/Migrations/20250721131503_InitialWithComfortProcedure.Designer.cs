@@ -12,8 +12,8 @@ using MySensorApi.Data;
 namespace MySensorApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250718093655_AddRoomWiseComfortTriggerAndProcedure")]
-    partial class AddRoomWiseComfortTriggerAndProcedure
+    [Migration("20250721131503_InitialWithComfortProcedure")]
+    partial class InitialWithComfortProcedure
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,28 @@ namespace MySensorApi.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("MySensorApi.Models.ComfortRecommendation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Recommendation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RoomName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ComfortRecommendations");
+                });
 
             modelBuilder.Entity("MySensorApi.Models.SensorData", b =>
                 {
@@ -48,14 +70,14 @@ namespace MySensorApi.Migrations
                     b.Property<string>("Light")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("LightAnalog")
-                        .HasColumnType("int");
+                    b.Property<double?>("LightAnalog")
+                        .HasColumnType("float");
 
                     b.Property<double?>("LightAnalogPercent")
                         .HasColumnType("float");
 
-                    b.Property<int?>("MQ2Analog")
-                        .HasColumnType("int");
+                    b.Property<double?>("MQ2Analog")
+                        .HasColumnType("float");
 
                     b.Property<double?>("MQ2AnalogPercent")
                         .HasColumnType("float");
