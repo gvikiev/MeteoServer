@@ -27,7 +27,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-//Check if DB exist and run migration
+//Check run migration
 if(app.Environment.IsDevelopment())
 {
     await using (var serviceScope = app.Services.CreateAsyncScope())
@@ -35,12 +35,6 @@ if(app.Environment.IsDevelopment())
     {
         await dbContext.Database.MigrateAsync();
     }
-}
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
 }
 
 // Middleware

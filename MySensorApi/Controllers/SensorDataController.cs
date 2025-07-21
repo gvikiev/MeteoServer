@@ -34,43 +34,9 @@ namespace MySensorApi.Controllers
         }
 
         [HttpGet]
-        public async Task<IEnumerable<SensorData>> GetLastSensorDataPerRoom()
+        public async Task<IEnumerable<SensorData>> GetSensorData()
         {
-            return await _context.SensorData
-                .GroupBy(s => s.RoomName)
-                .Select(g => g.OrderByDescending(s => s.Timestamp).FirstOrDefault()!)
-                .ToListAsync();
-        }
-
-
-        [HttpGet("latest")]
-        public async Task<IEnumerable<SensorDataDto>> GetLatestSensorData()
-        {
-            var latestPerRoom = await _context.SensorData
-                .GroupBy(s => s.RoomName)
-                .Select(g => g.OrderByDescending(s => s.Timestamp).FirstOrDefault()!)
-                .ToListAsync();
-
-            // Проєкція у DTO — тільки після того, як витягнули з БД
-            return latestPerRoom.Select(s => new SensorDataDto
-            {
-                RoomName = s.RoomName,
-                TemperatureDht = s.TemperatureDht,
-                HumidityDht = s.HumidityDht,
-                GasDetected = s.GasDetected,
-                Pressure = s.Pressure,
-                Altitude = s.Altitude,
-                Timestamp = s.Timestamp
-            });
-        }
-
-        [HttpGet("recommendations")]
-        public async Task<IEnumerable<ComfortRecommendation>> GetLatestRecommendations()
-        {
-            return await _context.ComfortRecommendations
-                .GroupBy(r => r.RoomName)
-                .Select(g => g.OrderByDescending(r => r.Timestamp).FirstOrDefault()!)
-                .ToListAsync();
-        }
+            return await _context.SensorData.ToListAsync();
+        }       
     }
 }
