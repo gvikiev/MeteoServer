@@ -12,5 +12,9 @@ namespace MySensorApi.Data
         public DbSet<ComfortRecommendation> ComfortRecommendations { get; set; }
 
         public DbSet<SensorData> SensorData { get; set; }
+
+        public DbSet<User> Users { get; set; }
+
+        public DbSet<Setting> Settings { get; set; }
     }
 }

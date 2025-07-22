@@ -51,6 +51,21 @@ namespace MySensorApi.Migrations
                 {
                     table.PrimaryKey("PK_SensorData", x => x.Id);
                 });
+            // ======== Users ========
+            migrationBuilder.CreateTable(
+                name: "Users",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                          .Annotation("SqlServer:Identity", "1, 1"),
+                    Login = table.Column<string>(type: "nvarchar(100)", nullable: false),
+                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(255)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Users", x => x.Id);
+                });
 
             // Якщо процедури ще немає — створити пусту
             migrationBuilder.Sql(@"
@@ -156,6 +171,7 @@ namespace MySensorApi.Migrations
             migrationBuilder.Sql("DROP PROCEDURE IF EXISTS GenerateComfortRecommendations;");
             migrationBuilder.DropTable(name: "ComfortRecommendations");
             migrationBuilder.DropTable(name: "SensorData");
+            migrationBuilder.DropTable(name: "Users");
         }
     }
 }

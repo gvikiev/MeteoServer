@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MySensorApi.Data;
 using MySensorApi.DTO;
@@ -18,6 +19,7 @@ namespace MySensorApi.Controllers
         }
 
         // Get latest sensor data for a specific room
+        [Authorize]
         [HttpGet("{roomName}")]
         public async Task<ActionResult<SensorData>> GetLastSensorDataPerRoom(string roomName)
         {
@@ -35,21 +37,23 @@ namespace MySensorApi.Controllers
         }
 
         // Alternative: Get latest data for ALL rooms (more efficient single query)
+        [Authorize]
         [HttpGet("all/latest-efficient")]
         public async Task<IEnumerable<SensorData>> GetLatestSensorDataAllRoomsEfficient()
         {
-            // Using a subquery approach that EF Core can handle better
-            var latestTimestamps = _context.SensorData
+            var latestPerRoom = await _context.SensorData
                 .GroupBy(s => s.RoomName)
-                .Select(g => new { RoomName = g.Key, MaxTimestamp = g.Max(s => s.Timestamp) });
-
-            return await _context.SensorData
-                .Where(s => latestTimestamps.Any(lt => lt.RoomName == s.RoomName && lt.MaxTimestamp == s.Timestamp))
+                .Select(g => g
+                    .OrderByDescending(s => s.Timestamp)
+                    .First())
                 .ToListAsync();
+
+            return latestPerRoom;
         }
 
         // Get latest sensor data for a specific room as DTO
-        [HttpGet("{roomName}/latest")]
+        [Authorize]
+        [HttpGet("{roomName}/latest/DTO")]
         public async Task<ActionResult<SensorDataDto>> GetLatestSensorData(string roomName)
         {
             var latestData = await _context.SensorData
@@ -78,6 +82,7 @@ namespace MySensorApi.Controllers
         }
 
         // Get latest recommendations for a specific room
+        [Authorize]
         [HttpGet("{roomName}/recommendations")]
         public async Task<ActionResult<ComfortRecommendation>> GetLatestRecommendations(string roomName)
         {
@@ -95,6 +100,7 @@ namespace MySensorApi.Controllers
         }
 
         // Alternative: Get latest recommendations for ALL rooms (if needed)
+        [Authorize]
         [HttpGet("all/recommendations")]
         public async Task<IEnumerable<ComfortRecommendation>> GetLatestRecommendationsAllRooms()
         {

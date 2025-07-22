@@ -7,6 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Migrations\20250722120031_AddUsersTableOrJwtSupport.cs" />
+    <Compile Remove="Migrations\20250722120031_AddUsersTableOrJwtSupport.Designer.cs" />
+    <Compile Remove="Migrations\20250722122437_AddUsersTableOrJwtSupport.cs" />
+    <Compile Remove="Migrations\20250722122437_AddUsersTableOrJwtSupport.Designer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JWT" Version="11.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.7" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.7" />
