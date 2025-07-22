@@ -21,7 +21,7 @@ namespace MySensorApi.Controllers
         }
 
         [AllowAnonymous]
-        [HttpPost]
+        [HttpPost("register")]
         public async Task<ActionResult<User>> Register(UserRegistrationDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.Login) ||
