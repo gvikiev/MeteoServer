@@ -1,4 +1,4 @@
-﻿namespace MySensorApi.Models
+﻿namespace MySensorApi.DTO
 {
     public class SensorDataDto
     {
