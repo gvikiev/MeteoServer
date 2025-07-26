@@ -84,7 +84,7 @@ namespace MySensorApi.Controllers
             });
         }
 
-        [Authorize] // захищено токеном
+        //[Authorize] // захищено токеном
         [HttpGet("{id}")]
         public async Task<ActionResult<string>> GetUsernameById(int id)
         {

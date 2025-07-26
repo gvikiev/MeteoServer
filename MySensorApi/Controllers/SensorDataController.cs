@@ -19,7 +19,7 @@ namespace MySensorApi.Controllers
             _context = context;
         }
 
-        [Authorize]
+        //[Authorize]
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] SensorData data)
         {
@@ -36,7 +36,7 @@ namespace MySensorApi.Controllers
             return Ok(new { message = "Дані збережено!" });
         }
 
-        [Authorize]
+        //[Authorize]
         [HttpGet]
         public async Task<IEnumerable<SensorData>> GetSensorData()
         {

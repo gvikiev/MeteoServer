@@ -8,7 +8,7 @@ namespace MySensorApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    //[Authorize]
     public class SettingsController : ControllerBase
     {
         private readonly AppDbContext _context;

@@ -19,7 +19,7 @@ namespace MySensorApi.Controllers
         }
 
         // Get latest sensor data for a specific room
-        [Authorize]
+        //[Authorize]
         [HttpGet("{roomName}")]
         public async Task<ActionResult<SensorData>> GetLastSensorDataPerRoom(string roomName)
         {
@@ -37,7 +37,7 @@ namespace MySensorApi.Controllers
         }
 
         // Alternative: Get latest data for ALL rooms (more efficient single query)
-        [Authorize]
+        //[Authorize]
         [HttpGet("all/latest-efficient")]
         public async Task<IEnumerable<SensorData>> GetLatestSensorDataAllRoomsEfficient()
         {
@@ -52,7 +52,7 @@ namespace MySensorApi.Controllers
         }
 
         // Get latest sensor data for a specific room as DTO
-        [Authorize]
+        //[Authorize]
         [HttpGet("{roomName}/latest/DTO")]
         public async Task<ActionResult<SensorDataDto>> GetLatestSensorData(string roomName)
         {
@@ -82,7 +82,7 @@ namespace MySensorApi.Controllers
         }
 
         // Get latest recommendations for a specific room
-        [Authorize]
+        //[Authorize]
         [HttpGet("{roomName}/recommendations")]
         public async Task<ActionResult<ComfortRecommendation>> GetLatestRecommendations(string roomName)
         {
@@ -100,7 +100,7 @@ namespace MySensorApi.Controllers
         }
 
         // Alternative: Get latest recommendations for ALL rooms (if needed)
-        [Authorize]
+        //[Authorize]
         [HttpGet("all/recommendations")]
         public async Task<IEnumerable<ComfortRecommendation>> GetLatestRecommendationsAllRooms()
         {
