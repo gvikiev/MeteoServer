@@ -13,8 +13,6 @@ namespace MySensorApi.Data
 
         public DbSet<SensorData> SensorData { get; set; }
 
-        public DbSet<User> Users { get; set; }
-
-        public DbSet<Setting> Settings { get; set; }
+        public DbSet<Room> Rooms { get; set; }
     }
 }

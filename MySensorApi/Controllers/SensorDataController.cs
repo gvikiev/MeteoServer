@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using MySensorApi.Data;
-using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
+using MySensorApi.DTO;
 using MySensorApi.Models;
+using System.Security.Claims;
 
 namespace MySensorApi.Controllers
 {
@@ -19,36 +20,67 @@ namespace MySensorApi.Controllers
             _context = context;
         }
 
-        [Authorize]
+        //[Authorize]
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] SensorData data)
         {
             _context.SensorData.Add(data);
             await _context.SaveChangesAsync();
 
-            if (!string.IsNullOrWhiteSpace(data.RoomName))
-            {
-                await _context.Database.ExecuteSqlInterpolatedAsync(
-                    $"EXEC GenerateComfortRecommendations @Room = {data.RoomName}");
-            }
-
-            Console.WriteLine("Процедура викликана...");
             return Ok(new { message = "Дані збережено!" });
         }
 
-        [Authorize]
+        //[Authorize]
         [HttpGet]
         public async Task<IEnumerable<SensorData>> GetSensorData()
         {
             return await _context.SensorData.ToListAsync();
         }
 
-        [Authorize]
-        [HttpGet("secure-test")]
-        public IActionResult SecureTest()
+        [HttpGet("room-info")]
+        public async Task<ActionResult<IEnumerable<object>>> GetRoomInfo()
         {
-            var username = User.Identity?.Name;
-            return Ok($"🔒 Привіт, {username}. Доступ дозволено.");
+            var rooms = await _context.Rooms.ToListAsync();
+            var result = new List<object>();
+
+            foreach (var room in rooms)
+            {
+                var latestSensor = await _context.SensorData
+                    .Where(s => s.RoomName == room.Name)
+                    .OrderByDescending(s => s.Timestamp)
+                    .FirstOrDefaultAsync();
+
+                result.Add(new
+                {
+                    room.Id,
+                    room.Name,
+                    room.ImageName,
+                    Temperature = latestSensor?.TemperatureDht ?? latestSensor?.TemperatureBme,
+                    Humidity = latestSensor?.HumidityDht ?? latestSensor?.HumidityBme,
+                    Timestamp = latestSensor?.Timestamp
+                });
+            }
+
+            return Ok(result);
+        }
+
+
+        [HttpPost("room")]
+        public async Task<IActionResult> CreateRoom([FromBody] RoomRequestDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Name) || string.IsNullOrWhiteSpace(dto.ImageName))
+                return BadRequest("Некоректні дані");
+
+            var room = new Room
+            {
+                Name = dto.Name,
+                ImageName = dto.ImageName
+            };
+
+            _context.Rooms.Add(room);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Кімната створена!", room.Id });
         }
     }
 }
