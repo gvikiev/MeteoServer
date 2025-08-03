@@ -2,8 +2,11 @@
 {
     public class SensorData
     {
-        public int? Id { get; set; } // ID об'экта
-        public string? RoomName { get; set; } //Назва кімнати
+        public int Id { get; set; } // ID об'экта
+        public string Username { get; set; } = string.Empty;
+        public int ChipId { get; set; }
+        public string ImageName { get; set; } = string.Empty;
+        public string RoomName { get; set; } = string.Empty;
         public double? TemperatureDht { get; set; } //Температура, Градуси Цельсія (°C)
         public double? HumidityDht { get; set; } //Вологість, Відсотки (%)
         public string? GasDetected { get; set; } = string.Empty; //Детектор газа, Текст: "Yes" / "No"
@@ -17,6 +20,5 @@
         public double? MQ2AnalogPercent { get; set; } //Детектор газа, Відсотки (%)
         public double? LightAnalogPercent { get; set; } //Детектор світлу, Відсотки (%)
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-
     }
 }

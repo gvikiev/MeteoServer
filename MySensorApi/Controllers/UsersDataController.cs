@@ -24,7 +24,7 @@ namespace MySensorApi.Controllers
         [HttpPost("register")]
         public async Task<ActionResult<User>> Register(UserRegistrationDto dto)
         {
-            if (string.IsNullOrWhiteSpace(dto.Login) ||
+            if (string.IsNullOrWhiteSpace(dto.Username) ||
                 string.IsNullOrWhiteSpace(dto.Password) ||
                 string.IsNullOrWhiteSpace(dto.Email))
             {
@@ -32,14 +32,14 @@ namespace MySensorApi.Controllers
             }
 
             // Перевірка унікальності логіну
-            if (_context.Users.Any(u => u.Login == dto.Login))
+            if (_context.Users.Any(u => u.Username == dto.Username))
             {
                 return Conflict("User with this login already exists.");
             }
 
             var user = new User
             {
-                Login = dto.Login,
+                Username = dto.Username,
                 PasswordHash = PasswordHasher.HashPassword(dto.Password),
                 Email = dto.Email
             };
@@ -52,9 +52,9 @@ namespace MySensorApi.Controllers
 
         [AllowAnonymous]
         [HttpPost("login")]
-        public async Task<IActionResult> Login(UserLoginDto dto, [FromServices] JwtTokenService tokenService)
+        public async Task<IActionResult> Login(RegisterDto dto, [FromServices] JwtTokenService tokenService)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Login == dto.Login);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dto.Username);
             if (user == null) return Unauthorized("Invalid login");
 
             var parts = user.PasswordHash.Split(':');
@@ -70,7 +70,7 @@ namespace MySensorApi.Controllers
 
             if (hashedInput != parts[1]) return Unauthorized("Invalid password");
 
-            var accessToken = tokenService.GenerateToken(user.Login);
+            var accessToken = tokenService.GenerateToken(user.Username);
             var refreshToken = tokenService.GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
@@ -93,7 +93,7 @@ namespace MySensorApi.Controllers
             if (user == null)
                 return NotFound("Користувача не знайдено");
 
-            return Ok(user.Login);
+            return Ok(user.Username);
         }
 
         [AllowAnonymous]
@@ -107,7 +107,7 @@ namespace MySensorApi.Controllers
             if (user == null)
                 return Unauthorized("Invalid or expired refresh token");
 
-            var newAccessToken = tokenService.GenerateToken(user.Login);
+            var newAccessToken = tokenService.GenerateToken(user.Username);
             var newRefreshToken = tokenService.GenerateRefreshToken();
 
             user.RefreshToken = newRefreshToken;
