@@ -8,6 +8,7 @@
         public string? GasDetected { get; set; } = string.Empty;
         public double? Pressure { get; set; }
         public double? Altitude { get; set; }
+
         public DateTime Timestamp { get; set; }
     }
 }
