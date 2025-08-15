@@ -18,18 +18,19 @@ namespace MySensorApi.Controllers
         }
 
         [HttpGet("ownership/{chipId}/latest")]
-        [HttpGet("byChipId/{chipId}")]
         public async Task<ActionResult<RoomWithSensorDto>> GetRoomByChipId(string chipId)
         {
+            var normalizedChipId = chipId.Trim().ToUpperInvariant();
+
             var ownership = await _context.SensorOwnerships
                 .Include(o => o.User)
-                .FirstOrDefaultAsync(o => o.ChipId == chipId);
+                .FirstOrDefaultAsync(o => o.ChipId == normalizedChipId);
 
             if (ownership == null)
                 return NotFound("Кімната не знайдена для chipId");
 
             var latestData = await _context.SensorData
-                .Where(d => d.ChipId == chipId)
+                .Where(d => d.ChipId == normalizedChipId)
                 .OrderByDescending(d => d.CreatedAt)
                 .FirstOrDefaultAsync();
 
@@ -43,9 +44,11 @@ namespace MySensorApi.Controllers
             });
         }
 
+
         [HttpGet("byUser/{userId}")]
         public async Task<ActionResult<IEnumerable<RoomWithSensorDto>>> GetRoomsByUserId(int userId)
         {
+
             var ownerships = await _context.SensorOwnerships
                 .Where(o => o.UserId == userId)
                 .ToListAsync();
@@ -79,10 +82,12 @@ namespace MySensorApi.Controllers
             if (string.IsNullOrEmpty(dto.ChipId) || string.IsNullOrEmpty(dto.RoomName))
                 return BadRequest("Обов'язкові поля відсутні");
 
+            var normalizedChipId = dto.ChipId.Trim().ToUpperInvariant();
+
             var ownership = new SensorOwnership
             {
                 UserId = dto.UserId,
-                ChipId = dto.ChipId,
+                ChipId = normalizedChipId,
                 RoomName = dto.RoomName,
                 ImageName = dto.ImageName
             };
@@ -92,5 +97,6 @@ namespace MySensorApi.Controllers
 
             return Ok(ownership);
         }
+
     }
 }

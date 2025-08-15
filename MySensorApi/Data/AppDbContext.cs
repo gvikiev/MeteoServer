@@ -33,6 +33,15 @@ namespace MySensorApi.Data
                 .WithMany(u => u.SensorOwnerships)
                 .HasForeignKey(so => so.UserId);
 
+            modelBuilder.Entity<SensorOwnership>()
+                .Property(so => so.ChipId)
+                .HasMaxLength(32)
+                .IsRequired();
+
+            modelBuilder.Entity<SensorOwnership>()
+                .HasIndex(so => so.ChipId);
+
+
             // SETTINGS USER ADJUSTMENT -> USER
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .HasOne(adjust => adjust.User)
@@ -80,6 +89,12 @@ namespace MySensorApi.Data
                 .Property(s => s.ParameterName)
                 .HasMaxLength(100)
                 .IsRequired();
+
+            // Seed Roles
+            modelBuilder.Entity<Role>().HasData(
+                new Role { Id = 1, RoleName = "User" },
+                new Role { Id = 2, RoleName = "Admin" }
+            );
         }
     }
 }

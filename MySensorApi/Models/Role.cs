@@ -1,10 +1,14 @@
-﻿namespace MySensorApi.Models
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace MySensorApi.Models
 {
     public class Role
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
         public string RoleName { get; set; } = null!;
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<User> Users { get; set; } = new List<User>();
     }

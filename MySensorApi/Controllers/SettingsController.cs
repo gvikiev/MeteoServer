@@ -29,7 +29,7 @@ namespace MySensorApi.Controllers
         [HttpGet("{name}")]
         public async Task<ActionResult<Setting>> GetSettingByName(string name)
         {
-            var setting = await _context.Settings.FirstOrDefaultAsync(s => s.Name == name);
+            var setting = await _context.Settings.FirstOrDefaultAsync(s => s.ParameterName == name);
             if (setting == null)
                 return NotFound($"Налаштування '{name}' не знайдено");
 
@@ -37,7 +37,7 @@ namespace MySensorApi.Controllers
         }
 
         // PUT: /api/Settings
-        [HttpPut]
+        /*ttpPut]
         public async Task<IActionResult> EditSetting([FromBody] Setting updated)
         {
             var setting = await _context.Settings.FirstOrDefaultAsync(s => s.Id == updated.Id);
@@ -48,6 +48,6 @@ namespace MySensorApi.Controllers
             await _context.SaveChangesAsync();
 
             return Ok("Налаштування оновлено");
-        }
+        }*/
     }
 }

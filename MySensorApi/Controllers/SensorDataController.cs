@@ -23,18 +23,16 @@ namespace MySensorApi.Controllers
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] SensorData data)
         {
+            data.CreatedAt = DateTime.UtcNow;
+
             _context.SensorData.Add(data);
             await _context.SaveChangesAsync();
 
-            if (!string.IsNullOrWhiteSpace(data.RoomName))
-            {
-                await _context.Database.ExecuteSqlInterpolatedAsync(
-                    $"EXEC GenerateComfortRecommendations @Room = {data.RoomName}");
-            }
+            Console.WriteLine("Дані збережено без виклику процедури.");
 
-            Console.WriteLine("Процедура викликана...");
-            return Ok(new { message = "Дані збережено!" });
+            return Ok(new { message = "Дані збережено!", id = data.Id });
         }
+
 
         //[Authorize]
         [HttpGet]

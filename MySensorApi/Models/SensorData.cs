@@ -12,9 +12,9 @@
         public float? Altitude { get; set; }
         public float? TemperatureBme { get; set; }
         public float? HumidityBme { get; set; }
-        public float? Mq2Analog { get; set; }
+        public int? Mq2Analog { get; set; }
         public float? Mq2AnalogPercent { get; set; }
-        public float? LightAnalog { get; set; }
+        public int? LightAnalog { get; set; }
         public float? LightAnalogPercent { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
