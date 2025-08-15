@@ -17,57 +17,80 @@ namespace MySensorApi.Controllers
             _context = context;
         }
 
-        // ✅ GET /api/DisplayData/{username}/latest/DTO
-        [HttpGet("{username}/{roomName}/latest/DTO")]
-        public async Task<ActionResult<SensorDataDto>> GetLatestSensorDataByUserAndRoom(string username, string roomName)
+        [HttpGet("ownership/{chipId}/latest")]
+        [HttpGet("byChipId/{chipId}")]
+        public async Task<ActionResult<RoomWithSensorDto>> GetRoomByChipId(string chipId)
         {
-            var latest = await _context.SensorData
-                .Where(s => s.Username == username && s.RoomName == roomName)
-                .OrderByDescending(s => s.Timestamp)
+            var ownership = await _context.SensorOwnerships
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.ChipId == chipId);
+
+            if (ownership == null)
+                return NotFound("Кімната не знайдена для chipId");
+
+            var latestData = await _context.SensorData
+                .Where(d => d.ChipId == chipId)
+                .OrderByDescending(d => d.CreatedAt)
                 .FirstOrDefaultAsync();
 
-            if (latest == null)
-                return NotFound($"Немає даних для {username} / {roomName}");
-
-            return Ok(new SensorDataDto
+            return Ok(new RoomWithSensorDto
             {
-                RoomName = latest.RoomName,
-                TemperatureDht = latest.TemperatureDht,
-                HumidityDht = latest.HumidityDht,
-                GasDetected = latest.GasDetected,
-                Pressure = latest.Pressure,
-                Altitude = latest.Altitude,
-                Timestamp = latest.Timestamp
+                Id = ownership.Id,
+                RoomName = ownership.RoomName,
+                ImageName = ownership.ImageName,
+                Temperature = latestData?.TemperatureDht,
+                Humidity = latestData?.HumidityDht
             });
         }
 
-
-        [HttpGet("{username}/{roomName}/recommendations")]
-        public async Task<ActionResult<ComfortRecommendation>> GetLatestRecommendationByUserAndRoom(string username, string roomName)
+        [HttpGet("byUser/{userId}")]
+        public async Task<ActionResult<IEnumerable<RoomWithSensorDto>>> GetRoomsByUserId(int userId)
         {
-            var latest = await _context.ComfortRecommendations
-                .Where(r => r.Username == username && r.RoomName == roomName)
-                .OrderByDescending(r => r.Timestamp)
-                .FirstOrDefaultAsync();
+            var ownerships = await _context.SensorOwnerships
+                .Where(o => o.UserId == userId)
+                .ToListAsync();
 
-            if (latest == null)
-                return NotFound($"Немає рекомендацій для {username} / {roomName}");
+            var result = new List<RoomWithSensorDto>();
 
-            return Ok(latest);
+            foreach (var ownership in ownerships)
+            {
+                var latestData = await _context.SensorData
+                    .Where(d => d.ChipId == ownership.ChipId)
+                    .OrderByDescending(d => d.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                result.Add(new RoomWithSensorDto
+                {
+                    Id = ownership.Id,
+                    RoomName = ownership.RoomName,
+                    ImageName = ownership.ImageName,
+                    Temperature = latestData?.TemperatureDht,
+                    Humidity = latestData?.HumidityDht
+                });
+            }
+
+            return Ok(result);
         }
 
 
-        // ✅ GET /api/DisplayData/{username}/rooms
-        [HttpGet("{username}/rooms")]
-        public async Task<ActionResult<IEnumerable<string>>> GetAllRoomNamesByUsername(string username)
+        [HttpPost("ownership")]
+        public async Task<IActionResult> CreateOwnership([FromBody] SensorOwnershipRequestDTO dto)
         {
-            var rooms = await _context.SensorData
-                .Where(s => s.Username == username)
-                .Select(s => s.RoomName)
-                .Distinct()
-                .ToListAsync();
+            if (string.IsNullOrEmpty(dto.ChipId) || string.IsNullOrEmpty(dto.RoomName))
+                return BadRequest("Обов'язкові поля відсутні");
 
-            return Ok(rooms);
+            var ownership = new SensorOwnership
+            {
+                UserId = dto.UserId,
+                ChipId = dto.ChipId,
+                RoomName = dto.RoomName,
+                ImageName = dto.ImageName
+            };
+
+            _context.SensorOwnerships.Add(ownership);
+            await _context.SaveChangesAsync();
+
+            return Ok(ownership);
         }
     }
 }

@@ -2,23 +2,20 @@
 {
     public class SensorData
     {
-        public int Id { get; set; } // ID об'экта
-        public string Username { get; set; } = string.Empty;
-        public int ChipId { get; set; }
-        public string ImageName { get; set; } = string.Empty;
-        public string RoomName { get; set; } = string.Empty;
-        public double? TemperatureDht { get; set; } //Температура, Градуси Цельсія (°C)
-        public double? HumidityDht { get; set; } //Вологість, Відсотки (%)
-        public string? GasDetected { get; set; } = string.Empty; //Детектор газа, Текст: "Yes" / "No"
-        public string? Light { get; set; } = string.Empty; //Детектор світлу, Текст: "Bright" / "Dark"
-        public double? Pressure { get; set; } //Тиск, Гектопаскалі (hPa)
-        public double? Altitude { get; set; } //Висота над рівнем моря, Метри (m)
-        public double? TemperatureBme { get; set; } //Температура, Градуси Цельсія (°C)
-        public double? HumidityBme { get; set; } //Вологість, Відсотки (%)
-        public double? MQ2Analog { get; set; } //Детектор газа, ppm
-        public double? LightAnalog { get; set; } //Детектор світлу, lux
-        public double? MQ2AnalogPercent { get; set; } //Детектор газа, Відсотки (%)
-        public double? LightAnalogPercent { get; set; } //Детектор світлу, Відсотки (%)
-        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+        public int Id { get; set; }
+        public string ChipId { get; set; } = null!;
+        public float? TemperatureDht { get; set; }
+        public float? HumidityDht { get; set; }
+        public bool? IsGasDetected { get; set; }
+        public string? LightTextValue { get; set; }
+        public float? Pressure { get; set; }
+        public float? Altitude { get; set; }
+        public float? TemperatureBme { get; set; }
+        public float? HumidityBme { get; set; }
+        public float? Mq2Analog { get; set; }
+        public float? Mq2AnalogPercent { get; set; }
+        public float? LightAnalog { get; set; }
+        public float? LightAnalogPercent { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }
