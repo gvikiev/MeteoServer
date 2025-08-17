@@ -79,29 +79,40 @@ namespace MySensorApi.Controllers
         [HttpPost("ownership")]
         public async Task<IActionResult> CreateOwnership([FromBody] SensorOwnershipRequestDTO dto)
         {
-            // Перевірка обов'язкових полів
-            if (string.IsNullOrEmpty(dto.ChipId) ||
-                string.IsNullOrEmpty(dto.RoomName) ||
-                string.IsNullOrEmpty(dto.Username))
+            // 🔐 Перевірка всіх обов’язкових полів
+            if (string.IsNullOrWhiteSpace(dto.ChipId) ||
+                string.IsNullOrWhiteSpace(dto.RoomName) ||
+                string.IsNullOrWhiteSpace(dto.ImageName) ||
+                string.IsNullOrWhiteSpace(dto.Username))
             {
-                return BadRequest("Обов'язкові поля відсутні");
+                return BadRequest("Усі поля (ChipId, RoomName, ImageName, Username) є обов’язковими");
             }
 
-            // Пошук користувача по імені
+            // 🔄 Нормалізація chipId
+            var normalizedChipId = dto.ChipId.Trim().ToUpperInvariant();
+
+            // 🔍 Пошук користувача по username
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dto.Username);
             if (user == null)
             {
                 return NotFound("Користувач не знайдений");
             }
 
-            var normalizedChipId = dto.ChipId.Trim().ToUpperInvariant();
+            // 🚫 Перевірка дублювання ChipId
+            var exists = await _context.SensorOwnerships
+                .AnyAsync(o => o.ChipId == normalizedChipId);
+            if (exists)
+            {
+                return Conflict("Цей пристрій уже зареєстрований");
+            }
 
+            // ✅ Створення нового запису
             var ownership = new SensorOwnership
             {
                 UserId = user.Id,
                 ChipId = normalizedChipId,
-                RoomName = dto.RoomName,
-                ImageName = dto.ImageName
+                RoomName = dto.RoomName.Trim(),
+                ImageName = dto.ImageName.Trim()
             };
 
             _context.SensorOwnerships.Add(ownership);
@@ -109,7 +120,5 @@ namespace MySensorApi.Controllers
 
             return Ok(ownership);
         }
-
-
     }
 }
