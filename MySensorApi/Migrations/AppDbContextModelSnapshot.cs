@@ -95,13 +95,16 @@ namespace MySensorApi.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool?>("GasDetected")
+                        .HasColumnType("bit");
+
                     b.Property<float?>("HumidityBme")
                         .HasColumnType("real");
 
                     b.Property<float?>("HumidityDht")
                         .HasColumnType("real");
 
-                    b.Property<bool?>("IsGasDetected")
+                    b.Property<bool?>("Light")
                         .HasColumnType("bit");
 
                     b.Property<int?>("LightAnalog")
@@ -109,9 +112,6 @@ namespace MySensorApi.Migrations
 
                     b.Property<float?>("LightAnalogPercent")
                         .HasColumnType("real");
-
-                    b.Property<string>("LightTextValue")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int?>("Mq2Analog")
                         .HasColumnType("int");

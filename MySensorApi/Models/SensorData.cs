@@ -6,8 +6,8 @@
         public string ChipId { get; set; } = null!;
         public float? TemperatureDht { get; set; }
         public float? HumidityDht { get; set; }
-        public bool? IsGasDetected { get; set; }
-        public string? LightTextValue { get; set; }
+        public bool? GasDetected { get; set; }
+        public bool? Light { get; set; }
         public float? Pressure { get; set; }
         public float? Altitude { get; set; }
         public float? TemperatureBme { get; set; }

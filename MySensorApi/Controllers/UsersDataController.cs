@@ -92,12 +92,17 @@ namespace MySensorApi.Controllers
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _context.SaveChangesAsync();
 
-            return Ok(new TokenResponseDto
+            return Ok(new UserDto
             {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                RoleName = user.Role?.RoleName ?? "User", // Якщо є навігація
                 AccessToken = accessToken,
                 RefreshToken = refreshToken
             });
         }
+
 
         //[Authorize] // захищено токеном
         [HttpGet("{id}")]

@@ -17,17 +17,17 @@ namespace MySensorApi.Controllers
             _context = context;
         }
 
-        [HttpGet("ownership/{chipId}/latest")]
-        public async Task<ActionResult<RoomWithSensorDto>> GetRoomByChipId(string chipId)
+        [HttpGet("ownership/{chipId}/user/{userId}/latest")]
+        public async Task<ActionResult<RoomWithSensorDto>> GetRoomByChipIdForUser(string chipId, int userId)
         {
             var normalizedChipId = chipId.Trim().ToUpperInvariant();
 
             var ownership = await _context.SensorOwnerships
                 .Include(o => o.User)
-                .FirstOrDefaultAsync(o => o.ChipId == normalizedChipId);
+                .FirstOrDefaultAsync(o => o.ChipId == normalizedChipId && o.UserId == userId);
 
             if (ownership == null)
-                return NotFound("Кімната не знайдена для chipId");
+                return NotFound("Кімната не знайдена для цього chipId і userId");
 
             var latestData = await _context.SensorData
                 .Where(d => d.ChipId == normalizedChipId)
@@ -79,14 +79,26 @@ namespace MySensorApi.Controllers
         [HttpPost("ownership")]
         public async Task<IActionResult> CreateOwnership([FromBody] SensorOwnershipRequestDTO dto)
         {
-            if (string.IsNullOrEmpty(dto.ChipId) || string.IsNullOrEmpty(dto.RoomName))
+            // Перевірка обов'язкових полів
+            if (string.IsNullOrEmpty(dto.ChipId) ||
+                string.IsNullOrEmpty(dto.RoomName) ||
+                string.IsNullOrEmpty(dto.Username))
+            {
                 return BadRequest("Обов'язкові поля відсутні");
+            }
+
+            // Пошук користувача по імені
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dto.Username);
+            if (user == null)
+            {
+                return NotFound("Користувач не знайдений");
+            }
 
             var normalizedChipId = dto.ChipId.Trim().ToUpperInvariant();
 
             var ownership = new SensorOwnership
             {
-                UserId = dto.UserId,
+                UserId = user.Id,
                 ChipId = normalizedChipId,
                 RoomName = dto.RoomName,
                 ImageName = dto.ImageName
@@ -97,6 +109,7 @@ namespace MySensorApi.Controllers
 
             return Ok(ownership);
         }
+
 
     }
 }
