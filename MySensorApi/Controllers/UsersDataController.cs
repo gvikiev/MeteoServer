@@ -22,7 +22,7 @@ namespace MySensorApi.Controllers
 
         [AllowAnonymous]
         [HttpPost("register")]
-        public async Task<ActionResult<User>> Register(UserRegistrationDto dto)
+        public async Task<ActionResult<UserDto>> Register(UserRegistrationDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.Username) ||
                 string.IsNullOrWhiteSpace(dto.Password) ||
@@ -37,22 +37,37 @@ namespace MySensorApi.Controllers
                 return Conflict("User with this login already exists.");
             }
 
+            // Отримуємо роль "User"
+            var userRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "User");
+            if (userRole == null)
+                return StatusCode(500, "Роль 'User' не знайдена в базі. Спочатку застосуйте Seed.");
+
             var user = new User
             {
                 Username = dto.Username,
                 PasswordHash = PasswordHasher.HashPassword(dto.Password),
-                Email = dto.Email
+                Email = dto.Email,
+                RoleId = userRole.Id
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(Register), new { id = user.Id }, user);
+            var result = new UserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                RoleName = userRole.RoleName
+            };
+
+            return CreatedAtAction(nameof(Register), new { id = user.Id }, result);
         }
+
 
         [AllowAnonymous]
         [HttpPost("login")]
-        public async Task<IActionResult> Login(RegisterDto dto, [FromServices] JwtTokenService tokenService)
+        public async Task<IActionResult> Login(UserLoginDto dto, [FromServices] JwtTokenService tokenService)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dto.Username);
             if (user == null) return Unauthorized("Invalid login");
@@ -77,12 +92,17 @@ namespace MySensorApi.Controllers
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _context.SaveChangesAsync();
 
-            return Ok(new TokenResponseDto
+            return Ok(new UserDto
             {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                RoleName = user.Role?.RoleName ?? "User", // Якщо є навігація
                 AccessToken = accessToken,
                 RefreshToken = refreshToken
             });
         }
+
 
         //[Authorize] // захищено токеном
         [HttpGet("{id}")]
