@@ -77,39 +77,38 @@ namespace MySensorApi.Controllers
 
 
         [HttpPost("ownership")]
-        public async Task<IActionResult> CreateOwnership([FromBody] SensorOwnershipRequestDTO dto)
+        public async Task<IActionResult> CreateOwnership([FromBody] SensorOwnershipCreateDto dto)
         {
-            // 🔐 Перевірка всіх обов’язкових полів
-            if (string.IsNullOrWhiteSpace(dto.ChipId) ||
+            // 🔐 Валідація
+            if (dto.UserId <= 0 ||
+                string.IsNullOrWhiteSpace(dto.ChipId) ||
                 string.IsNullOrWhiteSpace(dto.RoomName) ||
-                string.IsNullOrWhiteSpace(dto.ImageName) ||
-                string.IsNullOrWhiteSpace(dto.Username))
+                string.IsNullOrWhiteSpace(dto.ImageName))
             {
-                return BadRequest("Усі поля (ChipId, RoomName, ImageName, Username) є обов’язковими");
+                return BadRequest("Потрібні поля: UserId, ChipId, RoomName, ImageName");
             }
 
-            // 🔄 Нормалізація chipId
             var normalizedChipId = dto.ChipId.Trim().ToUpperInvariant();
 
-            // 🔍 Пошук користувача по username
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dto.Username);
-            if (user == null)
+            // 🔍 Перевірка, що користувач існує
+            var userExists = await _context.Users.AnyAsync(u => u.Id == dto.UserId);
+            if (!userExists)
             {
-                return NotFound("Користувач не знайдений");
+                return NotFound("Користувача не знайдено");
             }
 
-            // 🚫 Перевірка дублювання ChipId
-            var exists = await _context.SensorOwnerships
+            // 🚫 Перевірка дублювання ChipId (пристрій уже прив’язаний до будь-кого)
+            var chipTaken = await _context.SensorOwnerships
                 .AnyAsync(o => o.ChipId == normalizedChipId);
-            if (exists)
+            if (chipTaken)
             {
                 return Conflict("Цей пристрій уже зареєстрований");
             }
 
-            // ✅ Створення нового запису
+            // ✅ Створення
             var ownership = new SensorOwnership
             {
-                UserId = user.Id,
+                UserId = dto.UserId,
                 ChipId = normalizedChipId,
                 RoomName = dto.RoomName.Trim(),
                 ImageName = dto.ImageName.Trim()
@@ -118,7 +117,34 @@ namespace MySensorApi.Controllers
             _context.SensorOwnerships.Add(ownership);
             await _context.SaveChangesAsync();
 
-            return Ok(ownership);
+            // Готуємо DTO-відповідь (сенсори можуть бути ще відсутні)
+            var latestData = await _context.SensorData
+                .Where(d => d.ChipId == normalizedChipId)
+                .OrderByDescending(d => d.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            var roomDto = MapToRoomDto(ownership, latestData);
+
+            // RESTful: 201 Created + Location на GET
+            return CreatedAtAction(
+                nameof(GetRoomByChipIdForUser),
+                new { chipId = ownership.ChipId, userId = ownership.UserId },
+                roomDto
+            );
+        }
+
+        // ====== ХЕЛПЕР МАПІНГУ ======
+        private static RoomWithSensorDto MapToRoomDto(SensorOwnership ownership, SensorData? latestData)
+        {
+            return new RoomWithSensorDto
+            {
+                Id = ownership.Id,
+                ChipId = ownership.ChipId,        // ✅ додаємо ChipId у DTO
+                RoomName = ownership.RoomName,
+                ImageName = ownership.ImageName,
+                Temperature = latestData?.TemperatureDht,
+                Humidity = latestData?.HumidityDht
+            };
         }
     }
 }

@@ -7,7 +7,9 @@
         public User User { get; set; } = null!;
 
         public string ChipId { get; set; } = null!;
+
         public int UserId { get; set; }
+
         public string RoomName { get; set; } = null!;
 
         public string ImageName { get; set; } = null!;
