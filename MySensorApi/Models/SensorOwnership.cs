@@ -16,6 +16,7 @@
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        
+        public long Version { get; set; } = 1;                 // інкремент при кожній зміні
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow; // оновлюється при зміні
     }
 }

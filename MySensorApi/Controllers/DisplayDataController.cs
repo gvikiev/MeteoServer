@@ -111,7 +111,9 @@ namespace MySensorApi.Controllers
                 UserId = dto.UserId,
                 ChipId = normalizedChipId,
                 RoomName = dto.RoomName.Trim(),
-                ImageName = dto.ImageName.Trim()
+                ImageName = dto.ImageName.Trim(),
+                Version = 1,
+                UpdatedAt = DateTime.UtcNow
             };
 
             _context.SensorOwnerships.Add(ownership);

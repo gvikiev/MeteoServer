@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace MySensorApi.Migrations
 {
     /// <inheritdoc />
-    public partial class CreateTables : Migration
+    public partial class AddOwnershipVersion : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -104,7 +104,9 @@ namespace MySensorApi.Migrations
                     UserId = table.Column<int>(type: "int", nullable: false),
                     RoomName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     ImageName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Version = table.Column<long>(type: "bigint", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -185,7 +187,8 @@ namespace MySensorApi.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_SensorOwnerships_ChipId",
                 table: "SensorOwnerships",
-                column: "ChipId");
+                column: "ChipId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_SensorOwnerships_ChipId_UserId",
