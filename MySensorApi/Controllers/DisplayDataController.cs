@@ -65,6 +65,7 @@ namespace MySensorApi.Controllers
                 result.Add(new RoomWithSensorDto
                 {
                     Id = ownership.Id,
+                    ChipId = ownership.ChipId,
                     RoomName = ownership.RoomName,
                     ImageName = ownership.ImageName,
                     Temperature = latestData?.TemperatureDht,

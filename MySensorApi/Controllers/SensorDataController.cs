@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Humanizer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,8 @@ using MySensorApi.Data;
 using MySensorApi.DTO;
 using MySensorApi.Models;
 using System.Security.Claims;
+using Microsoft.Net.Http.Headers;           // EntityTagHeaderValue, HeaderNames
+using Microsoft.Extensions.Logging;
 
 namespace MySensorApi.Controllers
 {
@@ -15,10 +18,13 @@ namespace MySensorApi.Controllers
     {
         private readonly AppDbContext _context;
 
-        public SensorDataController(AppDbContext context)
+        public SensorDataController(AppDbContext context, ILogger<SensorDataController> logger)
         {
             _context = context;
+            _logger = logger;
         }
+
+        private readonly ILogger<SensorDataController> _logger;
 
         //[Authorize]
         [HttpPost]
@@ -50,39 +56,65 @@ namespace MySensorApi.Controllers
             return Ok($"🔒 Привіт, {username}. Доступ дозволено.");
         }
 
+
         [HttpGet("ownership/{chipId}/latest")]
-        public async Task<IActionResult> GetOwnershipForEsp(string chipId) // _ts = cache buster
+        public async Task<IActionResult> GetOwnershipForEsp([FromRoute] string chipId)
         {
+            if (string.IsNullOrWhiteSpace(chipId))
+                return BadRequest("chipId is required");
+
+            // Нормалізуємо, щоб збігалося з тим, як ти зберігаєш у БД
             var normalized = chipId.Trim().ToUpperInvariant();
 
+            // Беремо ОСТАННІЙ запис для цього ChipId
             var ownership = await _context.SensorOwnerships
-                .Where(o => o.ChipId == normalized)
-                .OrderByDescending(o => o.UpdatedAt) // ← беремо останній
+                .AsNoTracking()
                 .Include(o => o.User)
-                .AsNoTracking()                       // ← без кешу EF
+                .Where(o => o.ChipId == normalized)
+                .OrderByDescending(o => o.UpdatedAt)
                 .FirstOrDefaultAsync();
 
-            if (ownership == null) return NotFound();
+            if (ownership == null)
+                return NotFound();
 
-            var etag = $"\"{ownership.Version}\"";    // у лапках
-            if (Request.Headers.TryGetValue("If-None-Match", out var inm) && inm.ToString() == etag)
+            // УНІКАЛЬНИЙ ETag НА РЕСУРС: ChipId-Version (щоб різні чипи не колізували)
+            var etag = new EntityTagHeaderValue($"\"{ownership.ChipId}-{ownership.Version}\"");
+
+            // If-None-Match → 304, якщо збігається саме з цим ресурсом
+            var ifNoneMatch = Request.GetTypedHeaders().IfNoneMatch;
+            if (ifNoneMatch != null && ifNoneMatch.Any(t => t.Tag == etag.Tag))
+            {
+                // Повертаємо 304 і дублюємо валідні заголовки
+                var h304 = Response.GetTypedHeaders();
+                h304.ETag = etag;
+                h304.LastModified = new DateTimeOffset(ownership.UpdatedAt.ToUniversalTime());
+                h304.CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true, MustRevalidate = true };
+                Response.Headers[HeaderNames.Pragma] = "no-cache";
                 return StatusCode(StatusCodes.Status304NotModified);
+            }
 
-            Response.Headers.ETag = etag;
-            Response.Headers.LastModified = ownership.UpdatedAt.ToUniversalTime().ToString("R");
+            // Заголовки відповіді 200
+            var headers = Response.GetTypedHeaders();
+            headers.ETag = etag;
+            headers.LastModified = new DateTimeOffset(ownership.UpdatedAt.ToUniversalTime());
+            headers.CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true, MustRevalidate = true };
+            Response.Headers[HeaderNames.Pragma] = "no-cache";
 
-            // ⬇️ тимчасово, щоб Swagger/браузер НЕ кешували під час дебагу
-            Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
-            Response.Headers.Pragma = "no-cache";
-
-            return Ok(new OwnershipSyncDto
+            // DTO (camelCase забезпечується налаштуваннями в Program.cs)
+            var dto = new OwnershipSyncDto
             {
                 Username = ownership.User?.Username ?? "",
-                RoomName = ownership.RoomName,
-            });
+                RoomName = ownership.RoomName ?? "",
+                ImageName = ownership.ImageName ?? ""
+            };
+
+            _logger.LogInformation(
+                "OWN OUT: id={Id} chip={Chip} ver={Ver} upd={Upd:o} user={User} room={Room} img={Img}",
+                ownership.Id, ownership.ChipId, ownership.Version, ownership.UpdatedAt,
+                dto.Username, dto.RoomName, dto.ImageName);
+
+            return Ok(dto);
         }
-
-
 
         [HttpPut("ownership")]
         public async Task<IActionResult> UpdateOwnership([FromBody] SensorOwnershipUpdateDto dto)
@@ -103,7 +135,8 @@ namespace MySensorApi.Controllers
             // (Опційно) оптимістична конкуренція: клієнт шле If-Match: "<currentEtag>"
             if (Request.Headers.TryGetValue("If-Match", out var ifMatch))
             {
-                var currentEtag = $"\"{ownership.Version}\""; // важливо: в лапках
+                // 🔽 ТУТ: перевіряємо по ChipId-Version
+                var currentEtag = $"\"{ownership.ChipId}-{ownership.Version}\""; // важливо: в лапках
                 if (ifMatch.ToString() != currentEtag)
                     return StatusCode(StatusCodes.Status412PreconditionFailed);
             }
@@ -128,9 +161,9 @@ namespace MySensorApi.Controllers
 
             if (!changed)
             {
-                // Нічого не змінилось — просто повертаємо поточний ETag
-                Response.Headers.ETag = $"\"{ownership.Version}\"";
-                return NoContent(); // 204 без тіла — ОК для PUT
+                // 🔽 ТУТ: нічого не змінилось — повертаємо поточний ChipId-Version
+                Response.Headers.ETag = $"\"{ownership.ChipId}-{ownership.Version}\"";
+                return NoContent(); // 204 без тіла
             }
 
             ownership.Version++;
@@ -138,11 +171,24 @@ namespace MySensorApi.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Дай клієнту новий ETag (юзно для подальших If-Match / If-None-Match)
-            Response.Headers.ETag = $"\"{ownership.Version}\"";
+            // 🔽 ТУТ: після збереження повертаємо новий ChipId-Version
+            Response.Headers.ETag = $"\"{ownership.ChipId}-{ownership.Version}\"";
             return NoContent();
         }
 
+        [HttpDelete("ownership/{chipId}/user/{userId}")]
+        public async Task<IActionResult> DeleteOwnership(string chipId, int userId)
+        {
+            if (string.IsNullOrWhiteSpace(chipId)) return BadRequest("chipId required");
+            var norm = chipId.Trim().ToUpperInvariant();
 
+            var ow = await _context.SensorOwnerships
+                .FirstOrDefaultAsync(o => o.ChipId == norm && o.UserId == userId);
+            if (ow == null) return NotFound();
+
+            _context.SensorOwnerships.Remove(ow);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
     }
 }
