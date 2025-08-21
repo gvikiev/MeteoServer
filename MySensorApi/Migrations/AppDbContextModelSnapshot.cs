@@ -30,11 +30,10 @@ namespace MySensorApi.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ChipId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
 
                     b.Property<string>("Recommendation")
                         .IsRequired()
@@ -45,7 +44,7 @@ namespace MySensorApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SensorOwnershipId");
+                    b.HasIndex("SensorOwnershipId", "CreatedAt");
 
                     b.ToTable("ComfortRecommendations");
                 });
@@ -93,7 +92,9 @@ namespace MySensorApi.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
 
                     b.Property<bool?>("GasDetected")
                         .HasColumnType("bit");
@@ -187,20 +188,19 @@ namespace MySensorApi.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<float>("HighValue")
+                    b.Property<float?>("HighValue")
                         .HasColumnType("real");
 
                     b.Property<string>("HighValueMessage")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
-                    b.Property<float>("LowValue")
+                    b.Property<float?>("LowValue")
                         .HasColumnType("real");
 
                     b.Property<string>("LowValueMessage")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("ParameterName")
                         .IsRequired()
@@ -209,7 +209,37 @@ namespace MySensorApi.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ParameterName")
+                        .IsUnique();
+
                     b.ToTable("Settings");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            HighValue = 25f,
+                            HighValueMessage = "Занадто душно. Провітріть або ввімкніть кондиціонер.",
+                            LowValue = 18f,
+                            LowValueMessage = "Прохолодно. Зачиніть вікно або ввімкніть обігрів.",
+                            ParameterName = "temperature"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            HighValue = 60f,
+                            HighValueMessage = "Висока вологість. Провітріть приміщення.",
+                            LowValue = 30f,
+                            LowValueMessage = "Сухе повітря. Зволожте кімнату.",
+                            ParameterName = "humidity"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            HighValue = 1f,
+                            HighValueMessage = "Виявлено газ/забруднення. Провітріть негайно.",
+                            ParameterName = "gas"
+                        });
                 });
 
             modelBuilder.Entity("MySensorApi.Models.SettingsUserAdjustment", b =>
@@ -221,7 +251,9 @@ namespace MySensorApi.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
 
                     b.Property<float>("HighValueAdjustment")
                         .HasColumnType("real");
@@ -235,11 +267,17 @@ namespace MySensorApi.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("SettingId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "SettingId", "CreatedAt");
+
+                    b.HasIndex("UserId", "SettingId", "Version")
+                        .IsUnique();
 
                     b.ToTable("SettingsUserAdjustments");
                 });

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace MySensorApi.Migrations
 {
     /// <inheritdoc />
-    public partial class AddOwnershipVersion : Migration
+    public partial class InitClean : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -44,7 +44,7 @@ namespace MySensorApi.Migrations
                     Mq2AnalogPercent = table.Column<float>(type: "real", nullable: true),
                     LightAnalog = table.Column<int>(type: "int", nullable: true),
                     LightAnalogPercent = table.Column<float>(type: "real", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()")
                 },
                 constraints: table =>
                 {
@@ -58,11 +58,10 @@ namespace MySensorApi.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ParameterName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    LowValue = table.Column<float>(type: "real", nullable: false),
-                    HighValue = table.Column<float>(type: "real", nullable: false),
-                    LowValueMessage = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    HighValueMessage = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    LowValue = table.Column<float>(type: "real", nullable: true),
+                    HighValue = table.Column<float>(type: "real", nullable: true),
+                    LowValueMessage = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    HighValueMessage = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -129,7 +128,8 @@ namespace MySensorApi.Migrations
                     SettingId = table.Column<int>(type: "int", nullable: false),
                     LowValueAdjustment = table.Column<float>(type: "real", nullable: false),
                     HighValueAdjustment = table.Column<float>(type: "real", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Version = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()")
                 },
                 constraints: table =>
                 {
@@ -154,10 +154,9 @@ namespace MySensorApi.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    ChipId = table.Column<int>(type: "int", nullable: false),
                     SensorOwnershipId = table.Column<int>(type: "int", nullable: false),
                     Recommendation = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()")
                 },
                 constraints: table =>
                 {
@@ -179,16 +178,25 @@ namespace MySensorApi.Migrations
                     { 2, "Admin" }
                 });
 
+            migrationBuilder.InsertData(
+                table: "Settings",
+                columns: new[] { "Id", "HighValue", "HighValueMessage", "LowValue", "LowValueMessage", "ParameterName" },
+                values: new object[,]
+                {
+                    { 1, 25f, "Занадто душно. Провітріть або ввімкніть кондиціонер.", 18f, "Прохолодно. Зачиніть вікно або ввімкніть обігрів.", "temperature" },
+                    { 2, 60f, "Висока вологість. Провітріть приміщення.", 30f, "Сухе повітря. Зволожте кімнату.", "humidity" },
+                    { 3, 1f, "Виявлено газ/забруднення. Провітріть негайно.", null, null, "gas" }
+                });
+
             migrationBuilder.CreateIndex(
-                name: "IX_ComfortRecommendations_SensorOwnershipId",
+                name: "IX_ComfortRecommendations_SensorOwnershipId_CreatedAt",
                 table: "ComfortRecommendations",
-                column: "SensorOwnershipId");
+                columns: new[] { "SensorOwnershipId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_SensorOwnerships_ChipId",
                 table: "SensorOwnerships",
-                column: "ChipId",
-                unique: true);
+                column: "ChipId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SensorOwnerships_ChipId_UserId",
@@ -202,14 +210,26 @@ namespace MySensorApi.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Settings_ParameterName",
+                table: "Settings",
+                column: "ParameterName",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SettingsUserAdjustments_SettingId",
                 table: "SettingsUserAdjustments",
                 column: "SettingId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_SettingsUserAdjustments_UserId",
+                name: "IX_SettingsUserAdjustments_UserId_SettingId_CreatedAt",
                 table: "SettingsUserAdjustments",
-                column: "UserId");
+                columns: new[] { "UserId", "SettingId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SettingsUserAdjustments_UserId_SettingId_Version",
+                table: "SettingsUserAdjustments",
+                columns: new[] { "UserId", "SettingId", "Version" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_RoleId",

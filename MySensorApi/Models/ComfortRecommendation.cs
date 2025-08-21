@@ -4,12 +4,11 @@
     {
         public int Id { get; set; }
 
-        public int ChipId { get; set; }
+        // FK -> SensorOwnership
+        public int SensorOwnershipId { get; set; }
+        public SensorOwnership SensorOwnership { get; set; } = null!;
 
-        public SensorOwnership SensorOwnership { get; set; }
-
-        public string Recommendation { get; set; }
-
-        public DateTime CreatedAt { get; set; }
+        public string Recommendation { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

@@ -8,7 +8,7 @@ namespace MySensorApi.Data
         public AppDbContext(DbContextOptions<AppDbContext> options)
             : base(options) { }
 
-        // DbSet
+        // DbSet-и
         public DbSet<User> Users { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<SensorOwnership> SensorOwnerships { get; set; }
@@ -21,79 +21,141 @@ namespace MySensorApi.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // USER -> ROLE
+            // ------------------ USER / ROLE ------------------
             modelBuilder.Entity<User>()
                 .HasOne(u => u.Role)
                 .WithMany(r => r.Users)
                 .HasForeignKey(u => u.RoleId);
 
-            // SENSOR OWNERSHIP -> USER
+            modelBuilder.Entity<User>()
+                .Property(u => u.Username).HasMaxLength(50).IsRequired();
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.Email).HasMaxLength(100).IsRequired();
+
+            modelBuilder.Entity<Role>()
+                .Property(r => r.RoleName).HasMaxLength(50).IsRequired();
+
+            // Seed Roles
+            modelBuilder.Entity<Role>().HasData(
+                new Role { Id = 1, RoleName = "User" },
+                new Role { Id = 2, RoleName = "Admin" }
+            );
+
+            // ------------------ OWNERSHIP ------------------
             modelBuilder.Entity<SensorOwnership>()
                 .HasOne(so => so.User)
                 .WithMany(u => u.SensorOwnerships)
                 .HasForeignKey(so => so.UserId);
 
             modelBuilder.Entity<SensorOwnership>()
-                .Property(so => so.ChipId)
-                .HasMaxLength(32)
-                .IsRequired();
+                .Property(so => so.ChipId).HasMaxLength(32).IsRequired();
 
             modelBuilder.Entity<SensorOwnership>()
                 .HasIndex(so => so.ChipId);
 
+            modelBuilder.Entity<SensorOwnership>()
+                .Property(so => so.RoomName).HasMaxLength(100).IsRequired();
 
-            // SETTINGS USER ADJUSTMENT -> USER
+            // Унікальність зв’язки користувач+чип
+            modelBuilder.Entity<SensorOwnership>()
+                .HasIndex(so => new { so.ChipId, so.UserId })
+                .IsUnique();
+
+            // ------------------ SENSOR DATA ------------------
+            modelBuilder.Entity<SensorData>()
+                .Property(sd => sd.ChipId).IsRequired();
+
+            // дефолт часу (рекомендація)
+            modelBuilder.Entity<SensorData>()
+                .Property(sd => sd.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            // ------------------ SETTINGS ------------------
+            modelBuilder.Entity<Setting>()
+                .Property(s => s.ParameterName).HasMaxLength(100).IsRequired();
+
+            modelBuilder.Entity<Setting>()
+                .HasIndex(s => s.ParameterName)
+                .IsUnique(); // temperature / humidity / gas по одному
+
+            modelBuilder.Entity<Setting>()
+                .Property(s => s.LowValueMessage).HasMaxLength(500);
+
+            modelBuilder.Entity<Setting>()
+                .Property(s => s.HighValueMessage).HasMaxLength(500);
+
+            // ------------------ SETTINGS USER ADJUSTMENT ------------------
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .HasOne(adjust => adjust.User)
                 .WithMany()
                 .HasForeignKey(adjust => adjust.UserId);
 
-            // SETTINGS USER ADJUSTMENT -> SETTING
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .HasOne(adjust => adjust.Setting)
                 .WithMany(setting => setting.Adjustments)
                 .HasForeignKey(adjust => adjust.SettingId);
 
-            // SENSOR DATA REQUIRED FIELDS
-            modelBuilder.Entity<SensorData>()
-                .Property(sd => sd.ChipId)
-                .IsRequired();
+            modelBuilder.Entity<SettingsUserAdjustment>()
+                .Property(a => a.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
 
-            // SENSOR OWNERSHIP UNIQUE CONSTRAINT
-            modelBuilder.Entity<SensorOwnership>()
-                .HasIndex(so => new { so.ChipId, so.UserId })
-                .IsUnique();
+            // корисний індекс: остання дельта на користувача+настройку
+            modelBuilder.Entity<SettingsUserAdjustment>()
+                .HasIndex(a => new { a.UserId, a.SettingId, a.CreatedAt });
 
-            // STRING LENGTH CONSTRAINTS
-            modelBuilder.Entity<User>()
-                .Property(u => u.Username)
-                .HasMaxLength(50)
-                .IsRequired();
+            // ------------------ COMFORT RECOMMENDATION ------------------
+            modelBuilder.Entity<ComfortRecommendation>()
+                .HasOne(c => c.SensorOwnership)
+                .WithMany() // або .WithMany(o => o.Recommendations) якщо є колекція
+                .HasForeignKey(c => c.SensorOwnershipId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<User>()
-                .Property(u => u.Email)
-                .HasMaxLength(100)
-                .IsRequired();
+            modelBuilder.Entity<ComfortRecommendation>()
+                .Property(c => c.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
 
-            modelBuilder.Entity<Role>()
-                .Property(r => r.RoleName)
-                .HasMaxLength(50)
-                .IsRequired();
+            // швидкі запити "остання рекомендація по кімнаті"
+            modelBuilder.Entity<ComfortRecommendation>()
+                .HasIndex(c => new { c.SensorOwnershipId, c.CreatedAt });
 
-            modelBuilder.Entity<SensorOwnership>()
-                .Property(so => so.RoomName)
-                .HasMaxLength(100)
-                .IsRequired();
+            modelBuilder.Entity<SettingsUserAdjustment>()
+                .HasIndex(a => new { a.UserId, a.SettingId, a.Version })
+                .IsUnique(); // уникнення гонок версій
 
-            modelBuilder.Entity<Setting>()
-                .Property(s => s.ParameterName)
-                .HasMaxLength(100)
-                .IsRequired();
+            modelBuilder.Entity<SettingsUserAdjustment>()
+                .Property(a => a.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
 
-            // Seed Roles
-            modelBuilder.Entity<Role>().HasData(
-                new Role { Id = 1, RoleName = "User" },
-                new Role { Id = 2, RoleName = "Admin" }
+            // Seed Settings
+            modelBuilder.Entity<Setting>().HasData(
+                new Setting
+                {
+                    Id = 1,
+                    ParameterName = "temperature",
+                    LowValue = 18,
+                    HighValue = 25,
+                    LowValueMessage = "Прохолодно. Зачиніть вікно або ввімкніть обігрів.",
+                    HighValueMessage = "Занадто душно. Провітріть або ввімкніть кондиціонер."
+                },
+                new Setting
+                {
+                    Id = 2,
+                    ParameterName = "humidity",
+                    LowValue = 30,
+                    HighValue = 60,
+                    LowValueMessage = "Сухе повітря. Зволожте кімнату.",
+                    HighValueMessage = "Висока вологість. Провітріть приміщення."
+                },
+                new Setting
+                {
+                    Id = 3,
+                    ParameterName = "gas",
+                    LowValue = null,
+                    HighValue = 1,
+                    LowValueMessage = null,
+                    HighValueMessage = "Виявлено газ/забруднення. Провітріть негайно."
+                }
             );
         }
     }
