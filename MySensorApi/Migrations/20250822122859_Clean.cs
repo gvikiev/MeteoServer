@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace MySensorApi.Migrations
 {
     /// <inheritdoc />
-    public partial class InitClean : Migration
+    public partial class Clean : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,7 +31,7 @@ namespace MySensorApi.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    ChipId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ChipId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     TemperatureDht = table.Column<float>(type: "real", nullable: true),
                     HumidityDht = table.Column<float>(type: "real", nullable: true),
                     GasDetected = table.Column<bool>(type: "bit", nullable: true),
@@ -78,7 +78,7 @@ namespace MySensorApi.Migrations
                     RoleId = table.Column<int>(type: "int", nullable: false),
                     PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    RefreshToken = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RefreshToken = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     RefreshTokenExpiryTime = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -194,6 +194,11 @@ namespace MySensorApi.Migrations
                 columns: new[] { "SensorOwnershipId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_SensorData_ChipId_CreatedAt",
+                table: "SensorData",
+                columns: new[] { "ChipId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SensorOwnerships_ChipId",
                 table: "SensorOwnerships",
                 column: "ChipId");
@@ -235,6 +240,12 @@ namespace MySensorApi.Migrations
                 name: "IX_Users_RoleId",
                 table: "Users",
                 column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_Username",
+                table: "Users",
+                column: "Username",
+                unique: true);
         }
 
         /// <inheritdoc />

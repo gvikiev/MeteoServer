@@ -8,7 +8,6 @@ namespace MySensorApi.Data
         public AppDbContext(DbContextOptions<AppDbContext> options)
             : base(options) { }
 
-        // DbSet-и
         public DbSet<User> Users { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<SensorOwnership> SensorOwnerships { get; set; }
@@ -31,12 +30,18 @@ namespace MySensorApi.Data
                 .Property(u => u.Username).HasMaxLength(50).IsRequired();
 
             modelBuilder.Entity<User>()
+                .HasIndex(u => u.Username).IsUnique(); // ✅ унікальний логін
+
+            modelBuilder.Entity<User>()
                 .Property(u => u.Email).HasMaxLength(100).IsRequired();
+
+            // (опційно) обмеження на refresh token
+            modelBuilder.Entity<User>()
+                .Property(u => u.RefreshToken).HasMaxLength(200);
 
             modelBuilder.Entity<Role>()
                 .Property(r => r.RoleName).HasMaxLength(50).IsRequired();
 
-            // Seed Roles
             modelBuilder.Entity<Role>().HasData(
                 new Role { Id = 1, RoleName = "User" },
                 new Role { Id = 2, RoleName = "Admin" }
@@ -51,13 +56,18 @@ namespace MySensorApi.Data
             modelBuilder.Entity<SensorOwnership>()
                 .Property(so => so.ChipId).HasMaxLength(32).IsRequired();
 
+            // Якщо потрібен один-єдиний запис на ChipId — розкоментуй:
+            // modelBuilder.Entity<SensorOwnership>()
+            //     .HasIndex(so => so.ChipId).IsUnique(); // ✅
+
+            // якщо історія — лишаємо просто індекс
             modelBuilder.Entity<SensorOwnership>()
                 .HasIndex(so => so.ChipId);
 
             modelBuilder.Entity<SensorOwnership>()
                 .Property(so => so.RoomName).HasMaxLength(100).IsRequired();
 
-            // Унікальність зв’язки користувач+чип
+            // унікальність користувач+чип (захищає від дублю на одного юзера)
             modelBuilder.Entity<SensorOwnership>()
                 .HasIndex(so => new { so.ChipId, so.UserId })
                 .IsUnique();
@@ -66,10 +76,13 @@ namespace MySensorApi.Data
             modelBuilder.Entity<SensorData>()
                 .Property(sd => sd.ChipId).IsRequired();
 
-            // дефолт часу (рекомендація)
             modelBuilder.Entity<SensorData>()
                 .Property(sd => sd.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");
+
+            // ✅ композитний індекс для latest/history
+            modelBuilder.Entity<SensorData>()
+                .HasIndex(sd => new { sd.ChipId, sd.CreatedAt });
 
             // ------------------ SETTINGS ------------------
             modelBuilder.Entity<Setting>()
@@ -77,7 +90,7 @@ namespace MySensorApi.Data
 
             modelBuilder.Entity<Setting>()
                 .HasIndex(s => s.ParameterName)
-                .IsUnique(); // temperature / humidity / gas по одному
+                .IsUnique();
 
             modelBuilder.Entity<Setting>()
                 .Property(s => s.LowValueMessage).HasMaxLength(500);
@@ -98,16 +111,19 @@ namespace MySensorApi.Data
 
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .Property(a => a.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("GETUTCDATE()"); // ✅ залишаємо ОДИН раз
 
-            // корисний індекс: остання дельта на користувача+настройку
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .HasIndex(a => new { a.UserId, a.SettingId, a.CreatedAt });
+
+            modelBuilder.Entity<SettingsUserAdjustment>()
+                .HasIndex(a => new { a.UserId, a.SettingId, a.Version })
+                .IsUnique();
 
             // ------------------ COMFORT RECOMMENDATION ------------------
             modelBuilder.Entity<ComfortRecommendation>()
                 .HasOne(c => c.SensorOwnership)
-                .WithMany() // або .WithMany(o => o.Recommendations) якщо є колекція
+                .WithMany() // або .WithMany(o => o.Recommendations)
                 .HasForeignKey(c => c.SensorOwnershipId)
                 .OnDelete(DeleteBehavior.Cascade);
 
@@ -115,19 +131,10 @@ namespace MySensorApi.Data
                 .Property(c => c.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");
 
-            // швидкі запити "остання рекомендація по кімнаті"
             modelBuilder.Entity<ComfortRecommendation>()
                 .HasIndex(c => new { c.SensorOwnershipId, c.CreatedAt });
 
-            modelBuilder.Entity<SettingsUserAdjustment>()
-                .HasIndex(a => new { a.UserId, a.SettingId, a.Version })
-                .IsUnique(); // уникнення гонок версій
-
-            modelBuilder.Entity<SettingsUserAdjustment>()
-                .Property(a => a.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
-
-            // Seed Settings
+            // ------------------ Seed Settings ------------------
             modelBuilder.Entity<Setting>().HasData(
                 new Setting
                 {

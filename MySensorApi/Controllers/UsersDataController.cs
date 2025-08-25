@@ -1,11 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using MySensorApi.Data;
 using MySensorApi.DTO;
-using MySensorApi.Helpers;
-using MySensorApi.Models;
+using MySensorApi.Infrastructure.Auth;
+using MySensorApi.Services;
 
 namespace MySensorApi.Controllers
 {
@@ -13,132 +10,63 @@ namespace MySensorApi.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IUsersService _users;
 
-        public UsersController(AppDbContext context)
+        public UsersController(IUsersService users)
         {
-            _context = context;
+            _users = users;
         }
 
         [AllowAnonymous]
         [HttpPost("register")]
-        public async Task<ActionResult<UserDto>> Register(UserRegistrationDto dto)
+        public async Task<ActionResult<UserDto>> Register(UserRegistrationDto dto, CancellationToken ct)
         {
-            if (string.IsNullOrWhiteSpace(dto.Username) ||
-                string.IsNullOrWhiteSpace(dto.Password) ||
-                string.IsNullOrWhiteSpace(dto.Email))
+            try
             {
-                return BadRequest("All fields are required.");
+                var user = await _users.RegisterAsync(dto, ct);
+                return CreatedAtAction(nameof(Register), new { id = user.Id }, user);
             }
-
-            // Перевірка унікальності логіну
-            if (_context.Users.Any(u => u.Username == dto.Username))
+            catch (InvalidOperationException ex)
             {
-                return Conflict("User with this login already exists.");
+                return BadRequest(ex.Message);
             }
-
-            // Отримуємо роль "User"
-            var userRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "User");
-            if (userRole == null)
-                return StatusCode(500, "Роль 'User' не знайдена в базі. Спочатку застосуйте Seed.");
-
-            var user = new User
-            {
-                Username = dto.Username,
-                PasswordHash = PasswordHasher.HashPassword(dto.Password),
-                Email = dto.Email,
-                RoleId = userRole.Id
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            var result = new UserDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                Email = user.Email,
-                RoleName = userRole.RoleName
-            };
-
-            return CreatedAtAction(nameof(Register), new { id = user.Id }, result);
         }
-
 
         [AllowAnonymous]
         [HttpPost("login")]
-        public async Task<IActionResult> Login(UserLoginDto dto, [FromServices] JwtTokenService tokenService)
+        public async Task<IActionResult> Login(UserLoginDto dto, [FromServices] JwtTokenService tokenService, CancellationToken ct)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == dto.Username);
-            if (user == null) return Unauthorized("Invalid login");
-
-            var parts = user.PasswordHash.Split(':');
-            if (parts.Length != 2) return Unauthorized("Invalid hash format");
-
-            var salt = Convert.FromBase64String(parts[0]);
-            var hashedInput = Convert.ToBase64String(KeyDerivation.Pbkdf2(
-                password: dto.Password,
-                salt: salt,
-                prf: KeyDerivationPrf.HMACSHA256,
-                iterationCount: 10000,
-                numBytesRequested: 256 / 8));
-
-            if (hashedInput != parts[1]) return Unauthorized("Invalid password");
-
-            var accessToken = tokenService.GenerateToken(user.Username);
-            var refreshToken = tokenService.GenerateRefreshToken();
-
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-            await _context.SaveChangesAsync();
-
-            return Ok(new UserDto
+            try
             {
-                Id = user.Id,
-                Username = user.Username,
-                Email = user.Email,
-                RoleName = user.Role?.RoleName ?? "User", // Якщо є навігація
-                AccessToken = accessToken,
-                RefreshToken = refreshToken
-            });
+                var result = await _users.LoginAsync(dto, tokenService, ct);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ex.Message);
+            }
         }
 
-
-        //[Authorize] // захищено токеном
         [HttpGet("{id}")]
-        public async Task<ActionResult<string>> GetUsernameById(int id)
+        public async Task<ActionResult<string>> GetUsernameById(int id, CancellationToken ct)
         {
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null)
-                return NotFound("Користувача не знайдено");
-
-            return Ok(user.Username);
+            var name = await _users.GetUsernameByIdAsync(id, ct);
+            return name is null ? NotFound("Користувача не знайдено") : Ok(name);
         }
 
         [AllowAnonymous]
         [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto dto, [FromServices] JwtTokenService tokenService)
+        public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto dto, [FromServices] JwtTokenService tokenService, CancellationToken ct)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u =>
-                u.RefreshToken == dto.RefreshToken &&
-                u.RefreshTokenExpiryTime > DateTime.UtcNow);
-
-            if (user == null)
-                return Unauthorized("Invalid or expired refresh token");
-
-            var newAccessToken = tokenService.GenerateToken(user.Username);
-            var newRefreshToken = tokenService.GenerateRefreshToken();
-
-            user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-            await _context.SaveChangesAsync();
-
-            return Ok(new TokenResponseDto
+            try
             {
-                AccessToken = newAccessToken,
-                RefreshToken = newRefreshToken
-            });
+                var tokens = await _users.RefreshAsync(dto.RefreshToken, tokenService, ct);
+                return Ok(tokens);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ex.Message);
+            }
         }
     }
 }

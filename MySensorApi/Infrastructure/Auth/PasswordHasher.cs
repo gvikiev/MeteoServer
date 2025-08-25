@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using System.Security.Cryptography;
 
-namespace MySensorApi.Helpers
+namespace MySensorApi.Infrastructure.Auth
 {
     public class PasswordHasher
     {

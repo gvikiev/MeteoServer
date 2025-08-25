@@ -12,8 +12,8 @@ using MySensorApi.Data;
 namespace MySensorApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250821124708_InitClean")]
-    partial class InitClean
+    [Migration("20250822122859_Clean")]
+    partial class Clean
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -92,7 +92,7 @@ namespace MySensorApi.Migrations
 
                     b.Property<string>("ChipId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -133,6 +133,8 @@ namespace MySensorApi.Migrations
                         .HasColumnType("real");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ChipId", "CreatedAt");
 
                     b.ToTable("SensorData");
                 });
@@ -306,7 +308,8 @@ namespace MySensorApi.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RefreshToken")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateTime?>("RefreshTokenExpiryTime")
                         .HasColumnType("datetime2");
@@ -322,6 +325,9 @@ namespace MySensorApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("RoleId");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
