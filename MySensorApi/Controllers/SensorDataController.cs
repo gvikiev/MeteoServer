@@ -1,11 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using Microsoft.Net.Http.Headers;
 using MySensorApi.DTO;
 using MySensorApi.Models;
 using MySensorApi.Services;
-using System;
 using System.Security.Claims;
 
 namespace MySensorApi.Controllers
@@ -34,7 +31,7 @@ namespace MySensorApi.Controllers
             return int.TryParse(s, out var id) ? id : null;
         }
 
-        // POST api/sensordata
+        // --------- POST ---------
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] SensorData data, CancellationToken ct)
         {
@@ -44,7 +41,7 @@ namespace MySensorApi.Controllers
             return Ok(new { message = "Дані збережено!", id = data.Id });
         }
 
-        // GET api/sensordata/{chipId}/latest
+        // --------- LATEST ---------
         [HttpGet("{chipId}/latest")]
         public async Task<ActionResult<SensorDataDto>> GetLatest(string chipId, CancellationToken ct)
         {
@@ -52,7 +49,7 @@ namespace MySensorApi.Controllers
             return dto is null ? NotFound() : Ok(dto);
         }
 
-        // GET api/sensordata/{chipId}/history?take=50&from=...&to=...
+        // --------- HISTORY ---------
         [HttpGet("{chipId}/history")]
         public async Task<ActionResult<IEnumerable<SensorDataDto>>> GetHistory(
             string chipId,
@@ -65,7 +62,7 @@ namespace MySensorApi.Controllers
             return Ok(list);
         }
 
-        // GET api/sensordata/secure-test
+        // --------- SECURE TEST ---------
         [Authorize]
         [HttpGet("secure-test")]
         public IActionResult SecureTest()
@@ -74,7 +71,7 @@ namespace MySensorApi.Controllers
             return Ok($"🔒 Привіт, {username}. Доступ дозволено.");
         }
 
-        // GET api/sensordata/ownership/{chipId}/latest  (для ESP/синху) з підтримкою ETag/304
+        // --------- OWNERSHIP SYNC (ETag) ---------
         [HttpGet("ownership/{chipId}/latest")]
         public async Task<IActionResult> GetOwnershipForEsp([FromRoute] string chipId, CancellationToken ct)
         {
@@ -85,10 +82,14 @@ namespace MySensorApi.Controllers
             if (!string.IsNullOrEmpty(etag) && reqEtags != null &&
                 reqEtags.Any(t => string.Equals(t.Tag.ToString(), etag, StringComparison.Ordinal)))
             {
-                var h304 = Response.GetTypedHeaders();
-                h304.ETag = new Microsoft.Net.Http.Headers.EntityTagHeaderValue(etag);
-                if (lastModified.HasValue) h304.LastModified = new DateTimeOffset(lastModified.Value);
-                h304.CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue { NoStore = true, NoCache = true, MustRevalidate = true };
+                Response.GetTypedHeaders().ETag = new Microsoft.Net.Http.Headers.EntityTagHeaderValue(etag);
+                if (lastModified.HasValue) Response.GetTypedHeaders().LastModified = new DateTimeOffset(lastModified.Value);
+                Response.GetTypedHeaders().CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue
+                {
+                    NoStore = true,
+                    NoCache = true,
+                    MustRevalidate = true
+                };
                 Response.Headers[Microsoft.Net.Http.Headers.HeaderNames.Pragma] = "no-cache";
                 return StatusCode(StatusCodes.Status304NotModified);
             }
@@ -102,7 +103,7 @@ namespace MySensorApi.Controllers
             return Ok(dto);
         }
 
-        // PUT api/sensordata/ownership  (If-Match → 412)
+        // --------- OWNERSHIP UPDATE ---------
         [HttpPut("ownership")]
         public async Task<IActionResult> UpdateOwnership([FromBody] SensorOwnershipUpdateDto dto, CancellationToken ct)
         {
@@ -127,12 +128,34 @@ namespace MySensorApi.Controllers
             }
         }
 
-        // DELETE api/sensordata/ownership/{chipId}/user/{userId}
+        // --------- OWNERSHIP DELETE ---------
         [HttpDelete("ownership/{chipId}/user/{userId}")]
         public async Task<IActionResult> DeleteOwnership(string chipId, int userId, CancellationToken ct)
         {
             var ok = await _ownership.DeleteAsync(chipId, userId, ct);
             return ok ? NoContent() : NotFound();
         }
+
+        // --------- SERIES (для графіків) ---------
+        [HttpGet("ownership/{chipId}/series")]
+        public async Task<ActionResult<IEnumerable<SensorPointDto>>> GetSeries(
+            string chipId,
+            [FromQuery] TimeBucket bucket = TimeBucket.Hour,
+            [FromQuery] DateTime? from = null,
+            [FromQuery] DateTime? to = null,
+            CancellationToken ct = default)
+        {
+            var data = await _sensorData.GetSeriesAsync(chipId, from, to, bucket, ct);
+            return Ok(data);
+        }
+
+        // --------- SHORTCUTS (для клієнта) ---------
+        [HttpGet("ownership/{chipId}/day")]
+        public Task<ActionResult<IEnumerable<SensorPointDto>>> GetDaySeries(string chipId, CancellationToken ct)
+            => GetSeries(chipId, TimeBucket.Hour, null, null, ct);
+
+        [HttpGet("ownership/{chipId}/week")]
+        public Task<ActionResult<IEnumerable<SensorPointDto>>> GetWeekSeries(string chipId, CancellationToken ct)
+            => GetSeries(chipId, TimeBucket.Day, null, null, ct);
     }
 }
