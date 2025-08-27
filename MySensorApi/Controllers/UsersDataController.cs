@@ -11,19 +11,21 @@ namespace MySensorApi.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUsersService _users;
+        private readonly JwtTokenService _tokenService; // 👈 додали поле
 
-        public UsersController(IUsersService users)
+        public UsersController(IUsersService users, JwtTokenService tokenService)
         {
             _users = users;
+            _tokenService = tokenService;
         }
 
         [AllowAnonymous]
         [HttpPost("register")]
-        public async Task<ActionResult<UserDto>> Register(UserRegistrationDto dto, CancellationToken ct)
+        public async Task<ActionResult<UserDto>> Register(UserRegistrationDto dto,[FromServices] JwtTokenService tokenService,CancellationToken ct)
         {
             try
             {
-                var user = await _users.RegisterAsync(dto, ct);
+                var user = await _users.RegisterAsync(dto, tokenService, ct);
                 return CreatedAtAction(nameof(Register), new { id = user.Id }, user);
             }
             catch (InvalidOperationException ex)
@@ -31,6 +33,8 @@ namespace MySensorApi.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+
 
         [AllowAnonymous]
         [HttpPost("login")]

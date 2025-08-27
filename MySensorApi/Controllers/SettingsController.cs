@@ -139,5 +139,28 @@ namespace MySensorApi.Controllers
             var list = await _settings.GetAdviceHistoryAsync(chipId, take, ct);
             return Ok(list);
         }
+
+        // POST: /api/settings/adjustments  (bulk із абсолютними значеннями)
+        [HttpPost("adjustments")]
+        public async Task<ActionResult<AdjustmentAbsoluteResponseDto>> PostAdjustments(
+            [FromBody] AdjustmentAbsoluteRequestDto req,
+            CancellationToken ct)
+        {
+            var userId = TryGetUserId();
+            if (userId is null) return Unauthorized();
+            if (req?.Items == null || req.Items.Count == 0)
+                return BadRequest("Items are required");
+
+            try
+            {
+                var res = await _settings.SaveAdjustmentsFromAbsoluteAsync(userId.Value, req.Items, ct);
+                return Ok(res);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
     }
 }

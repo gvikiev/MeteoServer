@@ -8,7 +8,7 @@ namespace MySensorApi.Services
 {
     public interface IUsersService
     {
-        Task<UserDto> RegisterAsync(UserRegistrationDto dto, CancellationToken ct);
+        Task<UserDto> RegisterAsync(UserRegistrationDto dto, JwtTokenService tokenService, CancellationToken ct);
         Task<UserDto> LoginAsync(UserLoginDto dto, JwtTokenService tokenService, CancellationToken ct);
         Task<TokenResponseDto> RefreshAsync(string refreshToken, JwtTokenService tokenService, CancellationToken ct);
         Task<string?> GetUsernameByIdAsync(int id, CancellationToken ct);
@@ -20,7 +20,7 @@ namespace MySensorApi.Services
 
         public UsersService(IUsersRepository usersRepo) => _usersRepo = usersRepo;
 
-        public async Task<UserDto> RegisterAsync(UserRegistrationDto dto, CancellationToken ct)
+        public async Task<UserDto> RegisterAsync(UserRegistrationDto dto, JwtTokenService tokenService, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(dto.Username) ||
                 string.IsNullOrWhiteSpace(dto.Password) ||
@@ -31,17 +31,26 @@ namespace MySensorApi.Services
                 throw new InvalidOperationException("User with this login already exists.");
 
             var role = await _usersRepo.GetRoleByNameAsync("User", ct)
-                       ?? throw new InvalidOperationException("Роль 'User' не знайдена в базі. Спочатку застосуйте Seed.");
+                       ?? throw new InvalidOperationException("Роль 'User' не знайдена в базі.");
 
             var user = new User
             {
                 Username = dto.Username.Trim(),
                 PasswordHash = PasswordHasher.HashPassword(dto.Password),
                 Email = dto.Email.Trim(),
-                RoleId = role.Id
+                RoleId = role.Id,
+                Role = role
             };
 
             await _usersRepo.AddAsync(user, ct);
+            await _usersRepo.SaveChangesAsync(ct);
+
+            // ⬇️ Генеруємо токени одразу
+            var accessToken = tokenService.GenerateToken(user);
+            var refreshToken = tokenService.GenerateRefreshToken();
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _usersRepo.SaveChangesAsync(ct);
 
             return new UserDto
@@ -49,7 +58,9 @@ namespace MySensorApi.Services
                 Id = user.Id,
                 Username = user.Username,
                 Email = user.Email,
-                RoleName = role.RoleName
+                RoleName = role.RoleName,
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
             };
         }
 
@@ -61,7 +72,7 @@ namespace MySensorApi.Services
             if (!VerifyPassword(user.PasswordHash, dto.Password))
                 throw new UnauthorizedAccessException("Invalid password");
 
-            var accessToken = tokenService.GenerateToken(user.Username);
+            var accessToken = tokenService.GenerateToken(user);
             var refreshToken = tokenService.GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
@@ -85,7 +96,7 @@ namespace MySensorApi.Services
             if (user == null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
                 throw new UnauthorizedAccessException("Invalid or expired refresh token");
 
-            var newAccessToken = tokenService.GenerateToken(user.Username);
+            var newAccessToken = tokenService.GenerateToken(user); // 👈 тепер передаємо user
             var newRefreshToken = tokenService.GenerateRefreshToken();
 
             user.RefreshToken = newRefreshToken;
