@@ -104,6 +104,21 @@ namespace MySensorApi.Controllers
             return Ok(payload);
         }
 
+        [HttpGet("effective/{chipId}")]
+        public async Task<ActionResult<IEnumerable<EffectiveSettingDto>>> GetEffectiveByChip(string chipId, CancellationToken ct)
+        {
+            try
+            {
+                var payload = await _settings.GetEffectiveByChipAsync(chipId, ct);
+                return Ok(payload);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+
         [HttpGet("advice/{chipId}/latest")]
         public async Task<ActionResult<object>> ComputeLatestAdvice(string chipId, CancellationToken ct)
         {

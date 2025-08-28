@@ -58,6 +58,13 @@ namespace MySensorApi.Controllers
             return name is null ? NotFound("Користувача не знайдено") : Ok(name);
         }
 
+        [HttpGet("{id}/profile")]
+        public async Task<ActionResult<UserProfileDto>> GetUserById(int id, CancellationToken ct)
+        {
+            var profile = await _users.GetUserProfileAsync(id, ct);
+            return profile is null ? NotFound("Користувача не знайдено") : Ok(profile);
+        }
+
         [AllowAnonymous]
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto dto, [FromServices] JwtTokenService tokenService, CancellationToken ct)

@@ -21,6 +21,7 @@ namespace MySensorApi.Services
         Task<IEnumerable<object>> GetAdviceHistoryAsync(string chipId, int take, CancellationToken ct);
 
         Task<AdjustmentAbsoluteResponseDto> SaveAdjustmentsFromAbsoluteAsync(int userId, IEnumerable<AdjustmentAbsoluteItemDto> items, CancellationToken ct);
+        Task<IEnumerable<EffectiveSettingDto>> GetEffectiveByChipAsync(string chipId, CancellationToken ct);
     }
 
     internal sealed record EffSetting(float? Low, float? High, string? LowMsg, string? HighMsg);
@@ -310,10 +311,7 @@ namespace MySensorApi.Services
             return msgs;
         }
 
-        public async Task<AdjustmentAbsoluteResponseDto> SaveAdjustmentsFromAbsoluteAsync(
-    int userId,
-    IEnumerable<AdjustmentAbsoluteItemDto> items,
-    CancellationToken ct)
+        public async Task<AdjustmentAbsoluteResponseDto> SaveAdjustmentsFromAbsoluteAsync(int userId,IEnumerable<AdjustmentAbsoluteItemDto> items,CancellationToken ct)
         {
             if (items is null) throw new ArgumentNullException(nameof(items));
 
@@ -395,6 +393,24 @@ namespace MySensorApi.Services
 
             await _settingsRepo.SaveChangesAsync(ct);
             return response;
+        }
+
+        public async Task<IEnumerable<EffectiveSettingDto>> GetEffectiveByChipAsync(string chipId, CancellationToken ct)
+        {
+            var norm = ChipId.Normalize(chipId);
+            var ownership = await _ownRepo.GetByChipAsync(norm, ct);
+            if (ownership is null) throw new KeyNotFoundException("Chip not found");
+
+            var effDict = await BuildEffectiveSettingsAsync(ownership.UserId, ct);
+
+            return effDict.Select(kv => new EffectiveSettingDto
+            {
+                ParameterName = kv.Key,
+                LowValue = kv.Value.Low,
+                HighValue = kv.Value.High,
+                LowValueMessage = kv.Value.LowMsg,
+                HighValueMessage = kv.Value.HighMsg
+            });
         }
     }
 }

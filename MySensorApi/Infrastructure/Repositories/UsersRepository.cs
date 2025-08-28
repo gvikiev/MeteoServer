@@ -35,5 +35,7 @@ namespace MySensorApi.Infrastructure.Repositories
             _db.Users.AddAsync(user, ct).AsTask();
 
         public Task<int> SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
+
+
     }
 }

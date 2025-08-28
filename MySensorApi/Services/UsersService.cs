@@ -11,6 +11,7 @@ namespace MySensorApi.Services
         Task<UserDto> RegisterAsync(UserRegistrationDto dto, JwtTokenService tokenService, CancellationToken ct);
         Task<UserDto> LoginAsync(UserLoginDto dto, JwtTokenService tokenService, CancellationToken ct);
         Task<TokenResponseDto> RefreshAsync(string refreshToken, JwtTokenService tokenService, CancellationToken ct);
+        Task<UserProfileDto?> GetUserProfileAsync(int id, CancellationToken ct);
         Task<string?> GetUsernameByIdAsync(int id, CancellationToken ct);
     }
 
@@ -128,6 +129,19 @@ namespace MySensorApi.Services
                 numBytesRequested: 256 / 8));
 
             return hashedInput == parts[1];
+        }
+
+        public async Task<UserProfileDto?> GetUserProfileAsync(int id, CancellationToken ct)
+        {
+            var user = await _usersRepo.FindByIdAsync(id, ct);
+            if (user == null) return null;
+
+            return new UserProfileDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email
+            };
         }
     }
 }
