@@ -24,18 +24,18 @@ namespace MySensorApi.Data
             modelBuilder.Entity<User>()
                 .HasOne(u => u.Role)
                 .WithMany(r => r.Users)
-                .HasForeignKey(u => u.RoleId);
+                .HasForeignKey(u => u.RoleId)
+                .OnDelete(DeleteBehavior.NoAction); // 🚫 без каскаду
 
             modelBuilder.Entity<User>()
                 .Property(u => u.Username).HasMaxLength(50).IsRequired();
 
             modelBuilder.Entity<User>()
-                .HasIndex(u => u.Username).IsUnique(); // ✅ унікальний логін
+                .HasIndex(u => u.Username).IsUnique();
 
             modelBuilder.Entity<User>()
                 .Property(u => u.Email).HasMaxLength(100).IsRequired();
 
-            // (опційно) обмеження на refresh token
             modelBuilder.Entity<User>()
                 .Property(u => u.RefreshToken).HasMaxLength(200);
 
@@ -51,23 +51,18 @@ namespace MySensorApi.Data
             modelBuilder.Entity<SensorOwnership>()
                 .HasOne(so => so.User)
                 .WithMany(u => u.SensorOwnerships)
-                .HasForeignKey(so => so.UserId);
+                .HasForeignKey(so => so.UserId)
+                .OnDelete(DeleteBehavior.NoAction); // 🚫 щоб уникнути циклів
 
             modelBuilder.Entity<SensorOwnership>()
                 .Property(so => so.ChipId).HasMaxLength(32).IsRequired();
 
-            // Якщо потрібен один-єдиний запис на ChipId — розкоментуй:
-            // modelBuilder.Entity<SensorOwnership>()
-            //     .HasIndex(so => so.ChipId).IsUnique(); // ✅
-
-            // якщо історія — лишаємо просто індекс
             modelBuilder.Entity<SensorOwnership>()
                 .HasIndex(so => so.ChipId);
 
             modelBuilder.Entity<SensorOwnership>()
                 .Property(so => so.RoomName).HasMaxLength(100).IsRequired();
 
-            // унікальність користувач+чип (захищає від дублю на одного юзера)
             modelBuilder.Entity<SensorOwnership>()
                 .HasIndex(so => new { so.ChipId, so.UserId })
                 .IsUnique();
@@ -80,7 +75,6 @@ namespace MySensorApi.Data
                 .Property(sd => sd.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");
 
-            // ✅ композитний індекс для latest/history
             modelBuilder.Entity<SensorData>()
                 .HasIndex(sd => new { sd.ChipId, sd.CreatedAt });
 
@@ -102,30 +96,38 @@ namespace MySensorApi.Data
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .HasOne(adjust => adjust.User)
                 .WithMany()
-                .HasForeignKey(adjust => adjust.UserId);
+                .HasForeignKey(adjust => adjust.UserId)
+                .OnDelete(DeleteBehavior.NoAction); // 🚫
 
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .HasOne(adjust => adjust.Setting)
                 .WithMany(setting => setting.Adjustments)
-                .HasForeignKey(adjust => adjust.SettingId);
+                .HasForeignKey(adjust => adjust.SettingId)
+                .OnDelete(DeleteBehavior.NoAction); // 🚫
+
+            modelBuilder.Entity<SettingsUserAdjustment>()
+                .HasOne(a => a.SensorOwnership)
+                .WithMany()
+                .HasForeignKey(a => a.SensorOwnershipId)
+                .OnDelete(DeleteBehavior.Cascade); // ✅ логічно: кімната → її поправки
 
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .Property(a => a.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()"); // ✅ залишаємо ОДИН раз
+                .HasDefaultValueSql("GETUTCDATE()");
 
             modelBuilder.Entity<SettingsUserAdjustment>()
-                .HasIndex(a => new { a.UserId, a.SettingId, a.CreatedAt });
+                .HasIndex(a => new { a.UserId, a.SensorOwnershipId, a.SettingId, a.CreatedAt });
 
             modelBuilder.Entity<SettingsUserAdjustment>()
-                .HasIndex(a => new { a.UserId, a.SettingId, a.Version })
+                .HasIndex(a => new { a.UserId, a.SettingId, a.SensorOwnershipId, a.Version })
                 .IsUnique();
 
             // ------------------ COMFORT RECOMMENDATION ------------------
             modelBuilder.Entity<ComfortRecommendation>()
                 .HasOne(c => c.SensorOwnership)
-                .WithMany() // або .WithMany(o => o.Recommendations)
+                .WithMany()
                 .HasForeignKey(c => c.SensorOwnershipId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Cascade); // ✅ логічно: кімната → її рекомендації
 
             modelBuilder.Entity<ComfortRecommendation>()
                 .Property(c => c.CreatedAt)

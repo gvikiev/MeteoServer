@@ -89,8 +89,7 @@ namespace MySensorApi.Migrations
                         name: "FK_Users_Roles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "Roles",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -114,38 +113,7 @@ namespace MySensorApi.Migrations
                         name: "FK_SensorOwnerships_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "SettingsUserAdjustments",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserId = table.Column<int>(type: "int", nullable: false),
-                    SettingId = table.Column<int>(type: "int", nullable: false),
-                    LowValueAdjustment = table.Column<float>(type: "real", nullable: false),
-                    HighValueAdjustment = table.Column<float>(type: "real", nullable: false),
-                    Version = table.Column<int>(type: "int", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SettingsUserAdjustments", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_SettingsUserAdjustments_Settings_SettingId",
-                        column: x => x.SettingId,
-                        principalTable: "Settings",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_SettingsUserAdjustments_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -167,6 +135,42 @@ namespace MySensorApi.Migrations
                         principalTable: "SensorOwnerships",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SettingsUserAdjustments",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    SettingId = table.Column<int>(type: "int", nullable: false),
+                    SensorOwnershipId = table.Column<int>(type: "int", nullable: true),
+                    LowValueAdjustment = table.Column<float>(type: "real", nullable: false),
+                    HighValueAdjustment = table.Column<float>(type: "real", nullable: false),
+                    Version = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SettingsUserAdjustments", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_SettingsUserAdjustments_SensorOwnerships_SensorOwnershipId",
+                        column: x => x.SensorOwnershipId,
+                        principalTable: "SensorOwnerships",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_SettingsUserAdjustments_Settings_SettingId",
+                        column: x => x.SettingId,
+                        principalTable: "Settings",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_SettingsUserAdjustments_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.InsertData(
@@ -221,20 +225,26 @@ namespace MySensorApi.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SettingsUserAdjustments_SensorOwnershipId",
+                table: "SettingsUserAdjustments",
+                column: "SensorOwnershipId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SettingsUserAdjustments_SettingId",
                 table: "SettingsUserAdjustments",
                 column: "SettingId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_SettingsUserAdjustments_UserId_SettingId_CreatedAt",
+                name: "IX_SettingsUserAdjustments_UserId_SensorOwnershipId_SettingId_CreatedAt",
                 table: "SettingsUserAdjustments",
-                columns: new[] { "UserId", "SettingId", "CreatedAt" });
+                columns: new[] { "UserId", "SensorOwnershipId", "SettingId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_SettingsUserAdjustments_UserId_SettingId_Version",
+                name: "IX_SettingsUserAdjustments_UserId_SettingId_SensorOwnershipId_Version",
                 table: "SettingsUserAdjustments",
-                columns: new[] { "UserId", "SettingId", "Version" },
-                unique: true);
+                columns: new[] { "UserId", "SettingId", "SensorOwnershipId", "Version" },
+                unique: true,
+                filter: "[SensorOwnershipId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_RoleId",

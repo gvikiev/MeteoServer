@@ -8,6 +8,8 @@
         public int UserId { get; set; }
         public int SettingId { get; set; }
 
+        public int? SensorOwnershipId { get; set; }
+
         // Значення дельт
         public float LowValueAdjustment { get; set; }
         public float HighValueAdjustment { get; set; }
@@ -16,9 +18,11 @@
         public int Version { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
         // Навігаційні
         public User User { get; set; } = null!;
         public Setting Setting { get; set; } = null!;
+        public SensorOwnership? SensorOwnership { get; set; } = null!;
     }
 }

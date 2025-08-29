@@ -30,6 +30,15 @@ namespace MySensorApi.Infrastructure.Repositories
                .Where(a => a.UserId == userId && settingIds.Contains(a.SettingId))
                .ToListAsync(ct);
 
+        // 🔹 НОВЕ: по кімнаті/платі
+        public Task<List<SettingsUserAdjustment>> GetLastAdjustmentsAsync(int userId, int ownershipId, IEnumerable<int> settingIds, CancellationToken ct = default) =>
+            _db.SettingsUserAdjustments
+               .AsNoTracking()
+               .Where(a => a.UserId == userId &&
+                           a.SensorOwnershipId == ownershipId &&
+                           settingIds.Contains(a.SettingId))
+               .ToListAsync(ct);
+
         public Task AddAdjustmentAsync(SettingsUserAdjustment adj, CancellationToken ct = default) =>
             _db.SettingsUserAdjustments.AddAsync(adj, ct).AsTask();
 
@@ -45,5 +54,31 @@ namespace MySensorApi.Infrastructure.Repositories
             _db.ComfortRecommendations.AddAsync(rec, ct).AsTask();
 
         public Task<int> SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
+
+        public async Task UpsertAdjustmentAsync(SettingsUserAdjustment adj, CancellationToken ct = default)
+        {
+            var existing = await _db.SettingsUserAdjustments
+                .FirstOrDefaultAsync(a => a.UserId == adj.UserId &&
+                                          a.SensorOwnershipId == adj.SensorOwnershipId &&
+                                          a.SettingId == adj.SettingId, ct);
+
+            if (existing != null)
+            {
+                existing.LowValueAdjustment = adj.LowValueAdjustment;
+                existing.HighValueAdjustment = adj.HighValueAdjustment;
+                existing.Version += 1;
+                existing.UpdatedAt = DateTime.UtcNow;
+
+                _db.SettingsUserAdjustments.Update(existing);
+            }
+            else
+            {
+                adj.Version = 1;
+                adj.CreatedAt = DateTime.UtcNow;
+                adj.UpdatedAt = DateTime.UtcNow;
+
+                await _db.SettingsUserAdjustments.AddAsync(adj, ct);
+            }
+        }
     }
 }

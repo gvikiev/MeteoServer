@@ -263,8 +263,14 @@ namespace MySensorApi.Migrations
                     b.Property<float>("LowValueAdjustment")
                         .HasColumnType("real");
 
+                    b.Property<int?>("SensorOwnershipId")
+                        .HasColumnType("int");
+
                     b.Property<int>("SettingId")
                         .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
@@ -274,12 +280,15 @@ namespace MySensorApi.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SensorOwnershipId");
+
                     b.HasIndex("SettingId");
 
-                    b.HasIndex("UserId", "SettingId", "CreatedAt");
+                    b.HasIndex("UserId", "SensorOwnershipId", "SettingId", "CreatedAt");
 
-                    b.HasIndex("UserId", "SettingId", "Version")
-                        .IsUnique();
+                    b.HasIndex("UserId", "SettingId", "SensorOwnershipId", "Version")
+                        .IsUnique()
+                        .HasFilter("[SensorOwnershipId] IS NOT NULL");
 
                     b.ToTable("SettingsUserAdjustments");
                 });
@@ -345,7 +354,7 @@ namespace MySensorApi.Migrations
                     b.HasOne("MySensorApi.Models.User", "User")
                         .WithMany("SensorOwnerships")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.Navigation("User");
@@ -353,17 +362,24 @@ namespace MySensorApi.Migrations
 
             modelBuilder.Entity("MySensorApi.Models.SettingsUserAdjustment", b =>
                 {
+                    b.HasOne("MySensorApi.Models.SensorOwnership", "SensorOwnership")
+                        .WithMany()
+                        .HasForeignKey("SensorOwnershipId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("MySensorApi.Models.Setting", "Setting")
                         .WithMany("Adjustments")
                         .HasForeignKey("SettingId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("MySensorApi.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+
+                    b.Navigation("SensorOwnership");
 
                     b.Navigation("Setting");
 
@@ -375,7 +391,7 @@ namespace MySensorApi.Migrations
                     b.HasOne("MySensorApi.Models.Role", "Role")
                         .WithMany("Users")
                         .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.Navigation("Role");

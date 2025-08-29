@@ -12,6 +12,11 @@ namespace MySensorApi.Infrastructure.Repositories.Interfaces
         // user adjustments history (append-only)
         Task<List<SettingsUserAdjustment>> GetLastAdjustmentsAsync(
             int userId, IEnumerable<int> settingIds, CancellationToken ct = default);
+
+        // 🔹 НОВЕ: по конкретній кімнаті/платі
+        Task<List<SettingsUserAdjustment>> GetLastAdjustmentsAsync(
+            int userId, int ownershipId, IEnumerable<int> settingIds, CancellationToken ct = default);
+
         Task AddAdjustmentAsync(SettingsUserAdjustment adj, CancellationToken ct = default);
 
         // advice
@@ -19,5 +24,6 @@ namespace MySensorApi.Infrastructure.Repositories.Interfaces
         Task AddAdviceAsync(ComfortRecommendation rec, CancellationToken ct = default);
 
         Task<int> SaveChangesAsync(CancellationToken ct = default);
+        Task UpsertAdjustmentAsync(SettingsUserAdjustment adj, CancellationToken ct = default);
     }
 }

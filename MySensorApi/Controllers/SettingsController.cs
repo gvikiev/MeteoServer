@@ -45,9 +45,7 @@ namespace MySensorApi.Controllers
             return NoContent();
         }
 
-        // ---- Adjustments via ETag ----
-
-        // GET: /api/settings/adjustments/{parameterName}
+        // ==== User-level Adjustments (сумісність) ====
         [HttpGet("adjustments/{parameterName}")]
         public async Task<ActionResult<object>> GetAdjustment(string parameterName, CancellationToken ct)
         {
@@ -62,7 +60,6 @@ namespace MySensorApi.Controllers
             return Ok(payload);
         }
 
-        // PUT: /api/settings/adjustments/{parameterName}
         [HttpPut("adjustments/{parameterName}")]
         public async Task<IActionResult> PutAdjustment(string parameterName, [FromBody] AdjustmentCreateDto dto, CancellationToken ct)
         {
@@ -94,6 +91,72 @@ namespace MySensorApi.Controllers
             }
         }
 
+        // ==== Chip-level Adjustments (НОВЕ) ====
+
+        // GET: /api/settings/adjustments/{chipId}/{parameterName}
+        [HttpGet("adjustments/{chipId}/{parameterName}")]
+        public async Task<ActionResult<object>> GetAdjustmentForChip(string chipId, string parameterName, CancellationToken ct)
+        {
+            var (payload, etag) = await _settings.GetAdjustmentForChipAsync(parameterName, chipId, ct);
+
+            var headers = Response.GetTypedHeaders();
+            headers.ETag = new EntityTagHeaderValue(etag);
+            headers.CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true, MustRevalidate = true };
+
+            return Ok(payload);
+        }
+
+        // PUT: /api/settings/adjustments/{chipId}/{parameterName}
+        [HttpPut("adjustments/{chipId}/{parameterName}")]
+        public async Task<IActionResult> PutAdjustmentForChip(string chipId, string parameterName, [FromBody] AdjustmentCreateDto dto, CancellationToken ct)
+        {
+            var ifMatch = Request.GetTypedHeaders().IfMatch;
+            var tag = ifMatch?.FirstOrDefault()?.Tag.ToString() ?? string.Empty;
+
+            try
+            {
+                var (_, newEtag) = await _settings.PutAdjustmentForChipAsync(parameterName, chipId, dto, tag, ct);
+
+                var headers = Response.GetTypedHeaders();
+                headers.ETag = new EntityTagHeaderValue(newEtag);
+                headers.CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true, MustRevalidate = true };
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "428")
+            {
+                return StatusCode(StatusCodes.Status428PreconditionRequired, "Missing If-Match");
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "412")
+            {
+                return StatusCode(StatusCodes.Status412PreconditionFailed);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        // POST: /api/settings/adjustments/{chipId}  (bulk із абсолютними значеннями для конкретної плати)
+        [HttpPost("adjustments/{chipId}")]
+        public async Task<ActionResult<AdjustmentAbsoluteResponseDto>> PostAdjustmentsForChip(
+            string chipId,
+            [FromBody] AdjustmentAbsoluteRequestDto req,
+            CancellationToken ct)
+        {
+            if (req?.Items == null || req.Items.Count == 0)
+                return BadRequest("Items are required");
+
+            try
+            {
+                var res = await _settings.SaveAdjustmentsForChipFromAbsoluteAsync(chipId, req.Items, ct);
+                return Ok(res);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
         // ---- Effective + Advice ----
 
         [HttpGet("effective")]
@@ -117,7 +180,6 @@ namespace MySensorApi.Controllers
                 return NotFound(ex.Message);
             }
         }
-
 
         [HttpGet("advice/{chipId}/latest")]
         public async Task<ActionResult<object>> ComputeLatestAdvice(string chipId, CancellationToken ct)
@@ -154,28 +216,5 @@ namespace MySensorApi.Controllers
             var list = await _settings.GetAdviceHistoryAsync(chipId, take, ct);
             return Ok(list);
         }
-
-        // POST: /api/settings/adjustments  (bulk із абсолютними значеннями)
-        [HttpPost("adjustments")]
-        public async Task<ActionResult<AdjustmentAbsoluteResponseDto>> PostAdjustments(
-            [FromBody] AdjustmentAbsoluteRequestDto req,
-            CancellationToken ct)
-        {
-            var userId = TryGetUserId();
-            if (userId is null) return Unauthorized();
-            if (req?.Items == null || req.Items.Count == 0)
-                return BadRequest("Items are required");
-
-            try
-            {
-                var res = await _settings.SaveAdjustmentsFromAbsoluteAsync(userId.Value, req.Items, ct);
-                return Ok(res);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(ex.Message);
-            }
-        }
-
     }
 }
