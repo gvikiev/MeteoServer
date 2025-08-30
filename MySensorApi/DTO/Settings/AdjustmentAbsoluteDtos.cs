@@ -1,4 +1,4 @@
-﻿namespace MySensorApi.DTO
+﻿namespace MySensorApi.DTO.Settings
 {
     public sealed class AdjustmentAbsoluteRequestDto
     {

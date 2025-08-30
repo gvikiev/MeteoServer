@@ -1,4 +1,5 @@
-﻿using MySensorApi.DTO;
+﻿using MySensorApi.DTO.Charts;
+using MySensorApi.DTO.SensorData;
 using MySensorApi.Infrastructure.Repositories.Interfaces;
 using MySensorApi.Models;
 using MySensorApi.Services.Utils;
@@ -9,11 +10,14 @@ namespace MySensorApi.Services
     {
         Task<int> SaveAsync(SensorData data, CancellationToken ct = default);
         Task<SensorDataDto?> GetLatestAsync(string chipId, int? userId, CancellationToken ct = default);
-        Task<List<SensorDataDto>> GetHistoryAsync(string chipId, int? userId, DateTime? from, DateTime? to, int take, CancellationToken ct = default);
 
-        // Серії для графіків
-        Task<List<SensorPointDto>> GetSeriesAsync(string chipId, DateTime fromUtc, DateTime toUtc, TimeBucket bucket, CancellationToken ct = default);
-        Task<List<SensorPointDto>> GetSeriesAsync(string chipId, DateTime? from, DateTime? to, TimeBucket bucket, CancellationToken ct = default);
+        // Серії для графіків (з опціональними датами — контролер викликає day/week)
+        Task<List<SensorPointDto>> GetSeriesAsync(
+            string chipId,
+            DateTime? from,
+            DateTime? to,
+            TimeBucket bucket,
+            CancellationToken ct = default);
     }
 
     public sealed class SensorDataService : ISensorDataService
@@ -48,38 +52,6 @@ namespace MySensorApi.Services
             return Map(s, roomName ?? string.Empty);
         }
 
-        public async Task<List<SensorDataDto>> GetHistoryAsync(
-            string chipId, int? userId, DateTime? from, DateTime? to, int take, CancellationToken ct = default)
-        {
-            var norm = ChipId.Normalize(chipId);
-            var list = await _dataRepo.GetHistoryAsync(norm, from, to, take, ct);
-
-            var roomName = userId.HasValue
-                ? (await _ownRepo.GetByChipAndUserAsync(norm, userId.Value, ct))?.RoomName ?? string.Empty
-                : (await _ownRepo.GetByChipAsync(norm, ct))?.RoomName ?? string.Empty;
-
-            return list.Select(s => Map(s, roomName)).ToList();
-        }
-
-        // ------- ▼ СЕРІЇ ДЛЯ ГРАФІКІВ ▼ -------
-
-        // Виклик із обовʼязковими датами
-        public Task<List<SensorPointDto>> GetSeriesAsync(
-            string chipId,
-            DateTime fromUtc,
-            DateTime toUtc,
-            TimeBucket bucket,
-            CancellationToken ct = default)
-        {
-            var norm = ChipId.Normalize(chipId);
-            var from = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc);
-            var to = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc);
-            if (to < from) (from, to) = (to, from);
-
-            return _dataRepo.GetSeriesAsync(norm, from, to, bucket, ct);
-        }
-
-        // Виклик із опціональними датами
         public Task<List<SensorPointDto>> GetSeriesAsync(
             string chipId,
             DateTime? from,
@@ -88,8 +60,6 @@ namespace MySensorApi.Services
             CancellationToken ct = default)
         {
             var norm = ChipId.Normalize(chipId);
-
-            // дефолтні інтервали
             var toUtc = (to?.ToUniversalTime()) ?? DateTime.UtcNow;
             var fromUtc = (from?.ToUniversalTime()) ?? (bucket == TimeBucket.Day ? toUtc.AddDays(-7) : toUtc.AddDays(-1));
             if (fromUtc > toUtc) (fromUtc, toUtc) = (toUtc, fromUtc);

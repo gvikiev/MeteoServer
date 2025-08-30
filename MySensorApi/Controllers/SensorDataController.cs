@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using MySensorApi.DTO;
+﻿using Microsoft.AspNetCore.Mvc;
+using MySensorApi.DTO;                // <-- додано: тут живе SensorOwnershipDto
+using MySensorApi.DTO.Charts;
+using MySensorApi.DTO.SensorData;
 using MySensorApi.Models;
 using MySensorApi.Services;
 using System.Security.Claims;
@@ -31,7 +32,7 @@ namespace MySensorApi.Controllers
             return int.TryParse(s, out var id) ? id : null;
         }
 
-        // --------- POST ---------
+        // --------- POST: прийом телеметрії від ESP32 ---------
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] SensorData data, CancellationToken ct)
         {
@@ -41,37 +42,15 @@ namespace MySensorApi.Controllers
             return Ok(new { message = "Дані збережено!", id = data.Id });
         }
 
-        // --------- LATEST ---------
+        // --------- LATEST: останні дані по chipId ---------
         [HttpGet("{chipId}/latest")]
         public async Task<ActionResult<SensorDataDto>> GetLatest(string chipId, CancellationToken ct)
         {
             var dto = await _sensorData.GetLatestAsync(chipId, TryGetUserId(), ct);
-            return dto is null ? NotFound() : Ok(dto);
+            return dto is null ? NotFound() : dto;
         }
 
-        // --------- HISTORY ---------
-        [HttpGet("{chipId}/history")]
-        public async Task<ActionResult<IEnumerable<SensorDataDto>>> GetHistory(
-            string chipId,
-            [FromQuery] int take = 50,
-            [FromQuery] DateTime? from = null,
-            [FromQuery] DateTime? to = null,
-            CancellationToken ct = default)
-        {
-            var list = await _sensorData.GetHistoryAsync(chipId, TryGetUserId(), from, to, take, ct);
-            return Ok(list);
-        }
-
-        // --------- SECURE TEST ---------
-        [Authorize]
-        [HttpGet("secure-test")]
-        public IActionResult SecureTest()
-        {
-            var username = User.Identity?.Name ?? "(unknown)";
-            return Ok($"🔒 Привіт, {username}. Доступ дозволено.");
-        }
-
-        // --------- OWNERSHIP SYNC (ETag) ---------
+        // --------- ESP32 SYNC (ETag) — НЕ ЧІПАЄМО ---------
         [HttpGet("ownership/{chipId}/latest")]
         public async Task<IActionResult> GetOwnershipForEsp([FromRoute] string chipId, CancellationToken ct)
         {
@@ -103,9 +82,9 @@ namespace MySensorApi.Controllers
             return Ok(dto);
         }
 
-        // --------- OWNERSHIP UPDATE ---------
+        // --------- OWNERSHIP UPDATE (PUT, If-Match) ---------
         [HttpPut("ownership")]
-        public async Task<IActionResult> UpdateOwnership([FromBody] SensorOwnershipUpdateDto dto, CancellationToken ct)
+        public async Task<IActionResult> UpdateOwnership([FromBody] SensorOwnershipDto dto, CancellationToken ct)
         {
             try
             {
@@ -136,26 +115,19 @@ namespace MySensorApi.Controllers
             return ok ? NoContent() : NotFound();
         }
 
-        // --------- SERIES (для графіків) ---------
-        [HttpGet("ownership/{chipId}/series")]
-        public async Task<ActionResult<IEnumerable<SensorPointDto>>> GetSeries(
-            string chipId,
-            [FromQuery] TimeBucket bucket = TimeBucket.Hour,
-            [FromQuery] DateTime? from = null,
-            [FromQuery] DateTime? to = null,
-            CancellationToken ct = default)
+        // --------- SHORTCUTS для графіків (клієнт викликає day/week) ---------
+        [HttpGet("ownership/{chipId}/day")]
+        public async Task<ActionResult<IEnumerable<SensorPointDto>>> GetDaySeries(string chipId, CancellationToken ct)
         {
-            var data = await _sensorData.GetSeriesAsync(chipId, from, to, bucket, ct);
+            var data = await _sensorData.GetSeriesAsync(chipId, null, null, TimeBucket.Hour, ct);
             return Ok(data);
         }
 
-        // --------- SHORTCUTS (для клієнта) ---------
-        [HttpGet("ownership/{chipId}/day")]
-        public Task<ActionResult<IEnumerable<SensorPointDto>>> GetDaySeries(string chipId, CancellationToken ct)
-            => GetSeries(chipId, TimeBucket.Hour, null, null, ct);
-
         [HttpGet("ownership/{chipId}/week")]
-        public Task<ActionResult<IEnumerable<SensorPointDto>>> GetWeekSeries(string chipId, CancellationToken ct)
-            => GetSeries(chipId, TimeBucket.Day, null, null, ct);
+        public async Task<ActionResult<IEnumerable<SensorPointDto>>> GetWeekSeries(string chipId, CancellationToken ct)
+        {
+            var data = await _sensorData.GetSeriesAsync(chipId, null, null, TimeBucket.Day, ct);
+            return Ok(data);
+        }
     }
 }

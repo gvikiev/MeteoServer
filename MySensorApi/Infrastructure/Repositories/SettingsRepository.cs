@@ -13,35 +13,6 @@ namespace MySensorApi.Infrastructure.Repositories
         public Task<List<Setting>> GetAllAsync(CancellationToken ct = default) =>
             _db.Settings.AsNoTracking().ToListAsync(ct);
 
-        public Task<Setting?> GetByNameAsync(string name, CancellationToken ct = default) =>
-            _db.Settings.FirstOrDefaultAsync(s => s.ParameterName == name, ct);
-
-        public async Task UpsertAsync(Setting s, CancellationToken ct = default)
-        {
-            if (s.Id == 0)
-                await _db.Settings.AddAsync(s, ct);
-            else
-                _db.Settings.Update(s);
-        }
-
-        public Task<List<SettingsUserAdjustment>> GetLastAdjustmentsAsync(int userId, IEnumerable<int> settingIds, CancellationToken ct = default) =>
-            _db.SettingsUserAdjustments
-               .AsNoTracking()
-               .Where(a => a.UserId == userId && settingIds.Contains(a.SettingId))
-               .ToListAsync(ct);
-
-        // 🔹 НОВЕ: по кімнаті/платі
-        public Task<List<SettingsUserAdjustment>> GetLastAdjustmentsAsync(int userId, int ownershipId, IEnumerable<int> settingIds, CancellationToken ct = default) =>
-            _db.SettingsUserAdjustments
-               .AsNoTracking()
-               .Where(a => a.UserId == userId &&
-                           a.SensorOwnershipId == ownershipId &&
-                           settingIds.Contains(a.SettingId))
-               .ToListAsync(ct);
-
-        public Task AddAdjustmentAsync(SettingsUserAdjustment adj, CancellationToken ct = default) =>
-            _db.SettingsUserAdjustments.AddAsync(adj, ct).AsTask();
-
         public Task<List<ComfortRecommendation>> GetAdviceHistoryAsync(string chipId, int take, CancellationToken ct = default) =>
             _db.ComfortRecommendations
                .AsNoTracking()
@@ -53,14 +24,16 @@ namespace MySensorApi.Infrastructure.Repositories
         public Task AddAdviceAsync(ComfortRecommendation rec, CancellationToken ct = default) =>
             _db.ComfortRecommendations.AddAsync(rec, ct).AsTask();
 
-        public Task<int> SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
+        public Task SaveChangesAsync(CancellationToken ct = default) =>
+            _db.SaveChangesAsync(ct);
 
         public async Task UpsertAdjustmentAsync(SettingsUserAdjustment adj, CancellationToken ct = default)
         {
             var existing = await _db.SettingsUserAdjustments
-                .FirstOrDefaultAsync(a => a.UserId == adj.UserId &&
-                                          a.SensorOwnershipId == adj.SensorOwnershipId &&
-                                          a.SettingId == adj.SettingId, ct);
+                .FirstOrDefaultAsync(a =>
+                    a.UserId == adj.UserId &&
+                    a.SensorOwnershipId == adj.SensorOwnershipId &&
+                    a.SettingId == adj.SettingId, ct);
 
             if (existing != null)
             {
@@ -68,7 +41,6 @@ namespace MySensorApi.Infrastructure.Repositories
                 existing.HighValueAdjustment = adj.HighValueAdjustment;
                 existing.Version += 1;
                 existing.UpdatedAt = DateTime.UtcNow;
-
                 _db.SettingsUserAdjustments.Update(existing);
             }
             else
@@ -76,9 +48,18 @@ namespace MySensorApi.Infrastructure.Repositories
                 adj.Version = 1;
                 adj.CreatedAt = DateTime.UtcNow;
                 adj.UpdatedAt = DateTime.UtcNow;
-
                 await _db.SettingsUserAdjustments.AddAsync(adj, ct);
             }
         }
+
+        public Task<List<SettingsUserAdjustment>> GetLastAdjustmentsAsync(
+            int userId, int ownershipId, IEnumerable<int> settingIds, CancellationToken ct = default) =>
+            _db.SettingsUserAdjustments
+               .AsNoTracking()
+               .Where(a => a.UserId == userId &&
+                           a.SensorOwnershipId == ownershipId &&
+                           settingIds.Contains(a.SettingId))
+               .ToListAsync(ct);
+
     }
 }

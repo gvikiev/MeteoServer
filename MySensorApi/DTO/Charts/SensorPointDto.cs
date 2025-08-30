@@ -1,4 +1,4 @@
-﻿namespace MySensorApi.DTO
+﻿namespace MySensorApi.DTO.Charts
 {
     public enum TimeBucket { Raw = 0, Hour = 1, Day = 2 }
 

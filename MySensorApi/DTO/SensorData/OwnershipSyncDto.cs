@@ -1,4 +1,4 @@
-﻿namespace MySensorApi.DTO
+﻿namespace MySensorApi.DTO.SensorData
 {
     public class OwnershipSyncDto
     {

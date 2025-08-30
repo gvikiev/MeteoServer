@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using MySensorApi.DTO;
+using MySensorApi.DTO.User;
 using MySensorApi.Infrastructure.Auth;
 using MySensorApi.Infrastructure.Repositories.Interfaces;
 using MySensorApi.Models;
@@ -8,9 +9,10 @@ namespace MySensorApi.Services
 {
     public interface IUsersService
     {
-        Task<UserDto> RegisterAsync(UserRegistrationDto dto, JwtTokenService tokenService, CancellationToken ct);
-        Task<UserDto> LoginAsync(UserLoginDto dto, JwtTokenService tokenService, CancellationToken ct);
-        Task<TokenResponseDto> RefreshAsync(string refreshToken, JwtTokenService tokenService, CancellationToken ct);
+        Task<UserProfileDto> RegisterAsync(UserAuthRequestDto dto, CancellationToken ct);
+        Task<UserProfileDto> LoginAsync(UserAuthRequestDto dto, CancellationToken ct);
+        Task<UserProfileDto> RefreshAsync(string refreshToken, CancellationToken ct);
+
         Task<UserProfileDto?> GetUserProfileAsync(int id, CancellationToken ct);
         Task<string?> GetUsernameByIdAsync(int id, CancellationToken ct);
     }
@@ -18,10 +20,15 @@ namespace MySensorApi.Services
     public sealed class UsersService : IUsersService
     {
         private readonly IUsersRepository _usersRepo;
+        private readonly JwtTokenService _tokenService;
 
-        public UsersService(IUsersRepository usersRepo) => _usersRepo = usersRepo;
+        public UsersService(IUsersRepository usersRepo, JwtTokenService tokenService)
+        {
+            _usersRepo = usersRepo;
+            _tokenService = tokenService;
+        }
 
-        public async Task<UserDto> RegisterAsync(UserRegistrationDto dto, JwtTokenService tokenService, CancellationToken ct)
+        public async Task<UserProfileDto> RegisterAsync(UserAuthRequestDto dto, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(dto.Username) ||
                 string.IsNullOrWhiteSpace(dto.Password) ||
@@ -46,15 +53,14 @@ namespace MySensorApi.Services
             await _usersRepo.AddAsync(user, ct);
             await _usersRepo.SaveChangesAsync(ct);
 
-            // ⬇️ Генеруємо токени одразу
-            var accessToken = tokenService.GenerateToken(user);
-            var refreshToken = tokenService.GenerateRefreshToken();
+            var accessToken = _tokenService.GenerateToken(user);
+            var refreshToken = _tokenService.GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _usersRepo.SaveChangesAsync(ct);
 
-            return new UserDto
+            return new UserProfileDto
             {
                 Id = user.Id,
                 Username = user.Username,
@@ -65,7 +71,7 @@ namespace MySensorApi.Services
             };
         }
 
-        public async Task<UserDto> LoginAsync(UserLoginDto dto, JwtTokenService tokenService, CancellationToken ct)
+        public async Task<UserProfileDto> LoginAsync(UserAuthRequestDto dto, CancellationToken ct)
         {
             var user = await _usersRepo.GetByUsernameAsync(dto.Username, ct)
                        ?? throw new UnauthorizedAccessException("Invalid login");
@@ -73,14 +79,14 @@ namespace MySensorApi.Services
             if (!VerifyPassword(user.PasswordHash, dto.Password))
                 throw new UnauthorizedAccessException("Invalid password");
 
-            var accessToken = tokenService.GenerateToken(user);
-            var refreshToken = tokenService.GenerateRefreshToken();
+            var accessToken = _tokenService.GenerateToken(user);
+            var refreshToken = _tokenService.GenerateRefreshToken();
 
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _usersRepo.SaveChangesAsync(ct);
 
-            return new UserDto
+            return new UserProfileDto
             {
                 Id = user.Id,
                 Username = user.Username,
@@ -91,21 +97,25 @@ namespace MySensorApi.Services
             };
         }
 
-        public async Task<TokenResponseDto> RefreshAsync(string refreshToken, JwtTokenService tokenService, CancellationToken ct)
+        public async Task<UserProfileDto> RefreshAsync(string refreshToken, CancellationToken ct)
         {
             var user = await _usersRepo.FindByRefreshTokenAsync(refreshToken, ct);
             if (user == null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
                 throw new UnauthorizedAccessException("Invalid or expired refresh token");
 
-            var newAccessToken = tokenService.GenerateToken(user); // 👈 тепер передаємо user
-            var newRefreshToken = tokenService.GenerateRefreshToken();
+            var newAccessToken = _tokenService.GenerateToken(user);
+            var newRefreshToken = _tokenService.GenerateRefreshToken();
 
             user.RefreshToken = newRefreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
             await _usersRepo.SaveChangesAsync(ct);
 
-            return new TokenResponseDto
+            return new UserProfileDto
             {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                RoleName = user.Role?.RoleName ?? "User",
                 AccessToken = newAccessToken,
                 RefreshToken = newRefreshToken
             };
@@ -114,7 +124,22 @@ namespace MySensorApi.Services
         public async Task<string?> GetUsernameByIdAsync(int id, CancellationToken ct)
             => (await _usersRepo.FindByIdAsync(id, ct))?.Username;
 
-        // ---- helpers ----
+        public async Task<UserProfileDto?> GetUserProfileAsync(int id, CancellationToken ct)
+        {
+            var user = await _usersRepo.FindByIdAsync(id, ct);
+            if (user == null) return null;
+
+            return new UserProfileDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                RoleName = user.Role?.RoleName ?? "User"
+                // токени тут не повертаємо
+            };
+        }
+
+        // ===== helpers =====
         private static bool VerifyPassword(string storedHash, string plain)
         {
             var parts = storedHash.Split(':');
@@ -129,19 +154,6 @@ namespace MySensorApi.Services
                 numBytesRequested: 256 / 8));
 
             return hashedInput == parts[1];
-        }
-
-        public async Task<UserProfileDto?> GetUserProfileAsync(int id, CancellationToken ct)
-        {
-            var user = await _usersRepo.FindByIdAsync(id, ct);
-            if (user == null) return null;
-
-            return new UserProfileDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                Email = user.Email
-            };
         }
     }
 }

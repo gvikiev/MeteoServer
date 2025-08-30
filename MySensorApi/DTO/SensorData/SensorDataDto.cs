@@ -1,9 +1,9 @@
-﻿namespace MySensorApi.DTO
+﻿namespace MySensorApi.DTO.SensorData
 {
     public class SensorDataDto
     {
-        public string ChipId { get; set; }
-        public string RoomName { get; set; } 
+        public string? ChipId { get; set; }
+        public string? RoomName { get; set; }
 
         public float? TemperatureDht { get; set; }
         public float? HumidityDht { get; set; }

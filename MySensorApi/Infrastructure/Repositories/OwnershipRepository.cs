@@ -8,7 +8,11 @@ namespace MySensorApi.Infrastructure.Repositories
     public sealed class OwnershipRepository : IOwnershipRepository
     {
         private readonly AppDbContext _db;
-        public OwnershipRepository(AppDbContext db) => _db = db;
+
+        public OwnershipRepository(AppDbContext db)
+        {
+            _db = db ?? throw new ArgumentNullException(nameof(db));
+        }
 
         public Task<SensorOwnership?> GetByChipAndUserAsync(string chipId, int userId, CancellationToken ct = default) =>
             _db.SensorOwnerships

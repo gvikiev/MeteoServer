@@ -9,12 +9,12 @@ using System.Text.Json.Serialization;
 
 using MySensorApi.Infrastructure.Auth;
 using MySensorApi.Infrastructure.Repositories;
-using MySensorApi.Services;
 using MySensorApi.Infrastructure.Repositories.Interfaces;
+using MySensorApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Controllers + JSON
+// ===== Controllers + JSON =====
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
     {
@@ -24,11 +24,11 @@ builder.Services.AddControllers()
         o.JsonSerializerOptions.WriteIndented = false;
     });
 
-// EF Core
+// ===== EF Core =====
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Swagger
+// ===== Swagger =====
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -43,24 +43,28 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer"
     });
 
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement{
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
         {
-            new OpenApiSecurityScheme{
-                Reference = new OpenApiReference{ Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
             },
             Array.Empty<string>()
         }
     });
 });
 
-// CORS
+// ===== CORS =====
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod());
 });
 
-// Auth (JWT)
+// ===== Auth (JWT) =====
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
     throw new InvalidOperationException("Missing configuration 'Jwt:Key'.");
@@ -77,18 +81,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ClockSkew = TimeSpan.Zero // без штучного вікна
+            ClockSkew = TimeSpan.Zero // без штучної затримки
         };
     });
 
-// інфраструктура/сервіси
+// ===== DI: Інфраструктура + Сервіси =====
+
+// Auth
 builder.Services.AddScoped<JwtTokenService>();
 
+// Repositories
 builder.Services.AddScoped<IOwnershipRepository, OwnershipRepository>();
 builder.Services.AddScoped<ISensorDataRepository, SensorDataRepository>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<IUsersRepository, UsersRepository>();
 
+// Services
 builder.Services.AddScoped<IOwnershipService, OwnershipService>();
 builder.Services.AddScoped<ISensorDataService, SensorDataService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
@@ -96,7 +104,7 @@ builder.Services.AddScoped<IUsersService, UsersService>();
 
 var app = builder.Build();
 
-// Міграції у Dev (можна залишити)
+// ===== Auto-Migrate in Dev =====
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
@@ -104,17 +112,17 @@ if (app.Environment.IsDevelopment())
     db.Database.Migrate();
 }
 
-// Swagger (можна лишити завжди)
+// ===== Swagger =====
 app.UseSwagger();
-app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "MySensorApi v1"));
+app.UseSwaggerUI(c =>
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "MySensorApi v1"));
 
-// Pipeline
+// ===== Middleware Pipeline =====
 app.UseCors();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-// (опційно) healthcheck
-// app.MapGet("/health", () => Results.Ok("OK"));
 
 app.Run();
