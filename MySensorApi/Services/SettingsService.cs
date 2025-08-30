@@ -1,4 +1,5 @@
-﻿using MySensorApi.DTO.Recommendations;
+﻿using Microsoft.EntityFrameworkCore;
+using MySensorApi.DTO.Recommendations;
 using MySensorApi.DTO.Settings;
 using MySensorApi.Infrastructure.Repositories.Interfaces;
 using MySensorApi.Models;
@@ -10,6 +11,10 @@ namespace MySensorApi.Services
     {
         Task<RecommendationsDto> ComputeLatestAdviceAsync(string chipId, CancellationToken ct);
         Task<SaveLatestRecommendationDto> SaveLatestAdviceAsync(string chipId, CancellationToken ct);
+
+        // 🔹 нове: зберегти рекомендацію для КОНКРЕТНОГО виміру SensorData
+        Task<SaveLatestRecommendationDto> SaveAdviceForMeasurementAsync(SensorData measurement, CancellationToken ct);
+
         Task<IEnumerable<RecommendationHistoryDto>> GetAdviceHistoryAsync(string chipId, int take, CancellationToken ct);
         Task<AdjustmentAbsoluteResponseDto> SaveAdjustmentsForChipFromAbsoluteAsync(string chipId, IEnumerable<AdjustmentAbsoluteItemDto> items, CancellationToken ct);
         Task<IEnumerable<EffectiveSettingDto>> GetEffectiveByChipAsync(string chipId, CancellationToken ct);
@@ -50,28 +55,54 @@ namespace MySensorApi.Services
             };
         }
 
+        // Переписано: тепер просто делегуємо на конкретний вимір
         public async Task<SaveLatestRecommendationDto> SaveLatestAdviceAsync(string chipId, CancellationToken ct)
         {
             var norm = ChipId.Normalize(chipId);
-            var ownership = await _ownRepo.GetByChipAsync(norm, ct)
-                ?? throw new KeyNotFoundException("Chip not found");
-
-            var eff = await BuildEffectiveSettingsAsync(ownership.UserId, ownership.Id, ct);
             var latest = await _sensorRepo.GetLatestByChipIdAsync(norm, ct)
                 ?? throw new KeyNotFoundException("Немає сенсорних даних");
 
-            var advice = BuildAdvice(latest, eff);
-            if (advice.Count == 0) return new SaveLatestRecommendationDto { Saved = false, Count = 0 };
+            return await SaveAdviceForMeasurementAsync(latest, ct);
+        }
+
+        // 🔹 новий основний шлях: 1 вимір -> 1 рекомендація
+        public async Task<SaveLatestRecommendationDto> SaveAdviceForMeasurementAsync(SensorData s, CancellationToken ct)
+        {
+            if (s == null) throw new ArgumentNullException(nameof(s));
+            var normChip = ChipId.Normalize(s.ChipId ?? string.Empty);
+
+            var ownership = await _ownRepo.GetByChipAsync(normChip, ct)
+                ?? throw new KeyNotFoundException("Chip not found");
+
+            var eff = await BuildEffectiveSettingsAsync(ownership.UserId, ownership.Id, ct);
+            var msgs = BuildAdvice(s, eff);
+
+            var line = msgs.Count == 0 ? "Все в нормі." : JoinWithDots(msgs);
+
+            // 🔒 анти-дубль: один запис на один SensorDataId
+            if (await _settingsRepo.FindAdviceBySensorDataIdAsync(s.Id, ct) is not null)
+                return new SaveLatestRecommendationDto { Saved = false, Count = msgs.Count };
+
+            var createdAtUtc = DateTime.SpecifyKind(s.CreatedAt, DateTimeKind.Utc);
 
             await _settingsRepo.AddAdviceAsync(new ComfortRecommendation
             {
                 SensorOwnershipId = ownership.Id,
-                Recommendation = string.Join("\n", advice),
-                CreatedAt = DateTime.UtcNow
+                SensorDataId = s.Id,
+                Recommendation = line,
+                CreatedAt = createdAtUtc
             }, ct);
 
-            await _settingsRepo.SaveChangesAsync(ct);
-            return new SaveLatestRecommendationDto { Saved = true, Count = advice.Count };
+            try
+            {
+                await _settingsRepo.SaveChangesAsync(ct);
+                return new SaveLatestRecommendationDto { Saved = true, Count = msgs.Count };
+            }
+            catch (DbUpdateException)
+            {
+                // на випадок гонки — унікальний індекс з’їсть дубль
+                return new SaveLatestRecommendationDto { Saved = false, Count = msgs.Count };
+            }
         }
 
         public async Task<IEnumerable<RecommendationHistoryDto>> GetAdviceHistoryAsync(string chipId, int take, CancellationToken ct)
@@ -91,12 +122,9 @@ namespace MySensorApi.Services
                 throw new ArgumentException("Items are required");
 
             var norm = ChipId.Normalize(chipId);
-
-            // шукаємо кімнату
             var ownership = await _ownRepo.GetByChipAsync(norm, ct)
                 ?? throw new KeyNotFoundException("Chip not found");
 
-            // отримуємо базові налаштування
             var names = items.Select(i => i.ParameterName).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
             var all = await _settingsRepo.GetAllAsync(ct);
             var baseMap = all.Where(s => names.Contains(s.ParameterName, StringComparer.OrdinalIgnoreCase))
@@ -114,7 +142,6 @@ namespace MySensorApi.Services
                 if (s.HighValue.HasValue && item.High.HasValue)
                     highDelta = item.High.Value - s.HighValue.Value;
 
-                // остання версія
                 var last = (await _settingsRepo.GetLastAdjustmentsAsync(ownership.UserId, ownership.Id, new[] { s.Id }, ct))
                     .OrderByDescending(a => a.Version)
                     .FirstOrDefault();
@@ -153,15 +180,11 @@ namespace MySensorApi.Services
         public async Task<IEnumerable<EffectiveSettingDto>> GetEffectiveByChipAsync(string chipId, CancellationToken ct)
         {
             var norm = ChipId.Normalize(chipId);
-
-            // знайти власника плати
             var ownership = await _ownRepo.GetByChipAsync(norm, ct)
                 ?? throw new KeyNotFoundException("Chip not found");
 
-            // побудувати ефективні пороги з урахуванням базових Setting + останніх поправок користувача по цій платі
             var effDict = await BuildEffectiveSettingsAsync(ownership.UserId, ownership.Id, ct);
 
-            // змапити у DTO для відповіді
             return effDict.Select(kv => new EffectiveSettingDto
             {
                 ParameterName = kv.Key,
@@ -172,11 +195,7 @@ namespace MySensorApi.Services
             });
         }
 
-
-        // helpers BuildEffectiveSettingsAsync, BuildAdvice лишаємо як були
-        // =======================
-        // 🔹 Helpers
-        // =======================
+        // ===================== Helpers =====================
 
         private async Task<Dictionary<string, EffSetting>> BuildEffectiveSettingsAsync(
             int? userId, int? ownershipId, CancellationToken ct)
@@ -256,6 +275,14 @@ namespace MySensorApi.Services
             }
 
             return msgs;
+        }
+
+        private static string JoinWithDots(IEnumerable<string> xs)
+        {
+            var parts = xs.Where(s => !string.IsNullOrWhiteSpace(s))
+                          .Select(s => s.Trim().TrimEnd('.', '!', '?'));
+            var joined = string.Join(". ", parts);
+            return string.IsNullOrWhiteSpace(joined) ? string.Empty : joined + ".";
         }
     }
 }

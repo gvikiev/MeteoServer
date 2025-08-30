@@ -2,7 +2,6 @@
 using MySensorApi.DTO;                // <-- додано: тут живе SensorOwnershipDto
 using MySensorApi.DTO.Charts;
 using MySensorApi.DTO.SensorData;
-using MySensorApi.Models;
 using MySensorApi.Services;
 using System.Security.Claims;
 
@@ -34,12 +33,14 @@ namespace MySensorApi.Controllers
 
         // --------- POST: прийом телеметрії від ESP32 ---------
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody] SensorData data, CancellationToken ct)
+        public async Task<IActionResult> Post([FromBody] SensorDataInDto dto, CancellationToken ct)
         {
-            if (data == null) return BadRequest("Body is required");
-            await _sensorData.SaveAsync(data, ct);
-            _logger.LogInformation("SensorData saved: chip={Chip}", data.ChipId);
-            return Ok(new { message = "Дані збережено!", id = data.Id });
+            if (dto == null) return BadRequest("Body is required");
+
+            var id = await _sensorData.SaveAsync(dto, ct);
+            _logger.LogInformation("SensorData saved: chip={Chip}", dto.ChipId);
+
+            return Ok(new { message = "Дані збережено!", id });
         }
 
         // --------- LATEST: останні дані по chipId ---------

@@ -18,13 +18,17 @@ namespace MySensorApi.Infrastructure.Repositories
                .OrderByDescending(x => x.CreatedAt)
                .FirstOrDefaultAsync(ct);
 
+        public Task<SensorData?> FindByIdAsync(int id, CancellationToken ct = default) =>
+            _db.SensorData
+               .Include(x => x.ComfortRecommendation)
+               .FirstOrDefaultAsync(x => x.Id == id, ct);
+
         public Task AddAsync(SensorData data, CancellationToken ct = default) =>
             _db.SensorData.AddAsync(data, ct).AsTask();
 
         public Task<int> SaveChangesAsync(CancellationToken ct = default) =>
             _db.SaveChangesAsync(ct);
 
-        // ------- Серії: Hour / Day -------
         public async Task<List<SensorPointDto>> GetSeriesAsync(
             string chipId, DateTime fromUtc, DateTime toUtc, TimeBucket bucket, CancellationToken ct = default)
         {
@@ -52,7 +56,7 @@ namespace MySensorApi.Infrastructure.Repositories
                     (int)Math.Round(x.AvgHum ?? 0.0)
                 )).ToList();
             }
-            else // Hour (дефолт)
+            else
             {
                 var rows = await _db.SensorData.AsNoTracking()
                     .Where(x => x.ChipId == chipId && x.CreatedAt >= fromUtc && x.CreatedAt <= toUtc)
@@ -73,5 +77,14 @@ namespace MySensorApi.Infrastructure.Repositories
                 )).ToList();
             }
         }
+
+        // === Рекомендації по конкретному виміру ===
+        public Task<ComfortRecommendation?> GetRecommendationForDataAsync(int sensorDataId, CancellationToken ct = default) =>
+            _db.ComfortRecommendations
+               .AsNoTracking()
+               .FirstOrDefaultAsync(r => r.SensorDataId == sensorDataId, ct);
+
+        public Task AddRecommendationAsync(ComfortRecommendation rec, CancellationToken ct = default) =>
+            _db.ComfortRecommendations.AddAsync(rec, ct).AsTask();
     }
 }

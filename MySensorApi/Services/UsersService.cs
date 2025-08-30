@@ -15,6 +15,8 @@ namespace MySensorApi.Services
 
         Task<UserProfileDto?> GetUserProfileAsync(int id, CancellationToken ct);
         Task<string?> GetUsernameByIdAsync(int id, CancellationToken ct);
+        Task<UserProfileDto?> GetUsernameInfoAsync(int id, CancellationToken ct);
+        Task<UserProfileDto> ChangeUsernameAsync(int id, string newUsername, int expectedVersion, CancellationToken ct);
     }
 
     public sealed class UsersService : IUsersService
@@ -134,8 +136,60 @@ namespace MySensorApi.Services
                 Id = user.Id,
                 Username = user.Username,
                 Email = user.Email,
-                RoleName = user.Role?.RoleName ?? "User"
+                RoleName = user.Role?.RoleName ?? "User",
+                Version = user.Version,  // Переконайтесь, що тут передається актуальна версія
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
                 // токени тут не повертаємо
+            };
+        }
+
+        public async Task<UserProfileDto?> GetUsernameInfoAsync(int id, CancellationToken ct)
+        {
+            var user = await _usersRepo.FindByIdAsync(id, ct);
+            if (user == null) return null;
+
+            return new UserProfileDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                RoleName = user.Role?.RoleName ?? "User",
+                Version = user.Version,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            };
+        }
+
+        public async Task<UserProfileDto> ChangeUsernameAsync(int id, string newUsername, int expectedVersion, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(newUsername))
+                throw new InvalidOperationException("Username is required.");
+
+            var user = await _usersRepo.FindByIdAsync(id, ct)
+                       ?? throw new InvalidOperationException("User not found.");
+
+            if (expectedVersion != user.Version)
+                throw new InvalidOperationException("VersionConflict");
+
+            if (await _usersRepo.UsernameExistsForOtherAsync(newUsername, user.Id, ct))
+                throw new InvalidOperationException("UsernameTaken");
+
+            user.Username = newUsername.Trim();
+            user.Version += 1;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _usersRepo.SaveChangesAsync(ct);
+
+            return new UserProfileDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Email = user.Email,
+                RoleName = user.Role?.RoleName ?? "User",
+                Version = user.Version,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
             };
         }
 

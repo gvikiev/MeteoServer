@@ -8,6 +8,9 @@
         public int SensorOwnershipId { get; set; }
         public SensorOwnership SensorOwnership { get; set; } = null!;
 
+        public int? SensorDataId { get; set; }
+        public SensorData? SensorData { get; set; }
+
         public string Recommendation { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }

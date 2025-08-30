@@ -23,9 +23,12 @@ namespace MySensorApi.Infrastructure.Repositories
             _db.Users.Include(u => u.Role)
                      .FirstOrDefaultAsync(u => u.Username == username, ct);
 
-        public Task<User?> FindByIdAsync(int id, CancellationToken ct = default) =>
-            _db.Users.Include(u => u.Role)
-                     .FirstOrDefaultAsync(u => u.Id == id, ct);
+        public async Task<User?> FindByIdAsync(int id, CancellationToken ct = default)
+        {
+            return await _db.Users
+                .Include(u => u.Role)  // Переконайтесь, що ви отримуєте правильні дані
+                .FirstOrDefaultAsync(u => u.Id == id, ct);
+        }
 
         public Task<User?> FindByRefreshTokenAsync(string refreshToken, CancellationToken ct = default) =>
             _db.Users.Include(u => u.Role)
@@ -36,6 +39,8 @@ namespace MySensorApi.Infrastructure.Repositories
 
         public Task<int> SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
 
+        public Task<bool> UsernameExistsForOtherAsync(string username, int excludeUserId, CancellationToken ct = default) =>
+            _db.Users.AnyAsync(u => u.Username == username && u.Id != excludeUserId, ct);
 
     }
 }

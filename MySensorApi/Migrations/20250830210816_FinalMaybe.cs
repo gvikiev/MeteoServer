@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace MySensorApi.Migrations
 {
     /// <inheritdoc />
-    public partial class Clean : Migration
+    public partial class FinalMaybe : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -80,7 +80,9 @@ namespace MySensorApi.Migrations
                     Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     RefreshToken = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     RefreshTokenExpiryTime = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Version = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -123,12 +125,19 @@ namespace MySensorApi.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     SensorOwnershipId = table.Column<int>(type: "int", nullable: false),
+                    SensorDataId = table.Column<int>(type: "int", nullable: true),
                     Recommendation = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()")
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ComfortRecommendations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ComfortRecommendations_SensorData_SensorDataId",
+                        column: x => x.SensorDataId,
+                        principalTable: "SensorData",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_ComfortRecommendations_SensorOwnerships_SensorOwnershipId",
                         column: x => x.SensorOwnershipId,
@@ -193,9 +202,16 @@ namespace MySensorApi.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_ComfortRecommendations_SensorOwnershipId_CreatedAt",
+                name: "IX_ComfortRecommendations_SensorDataId",
                 table: "ComfortRecommendations",
-                columns: new[] { "SensorOwnershipId", "CreatedAt" });
+                column: "SensorDataId",
+                unique: true,
+                filter: "[SensorDataId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ComfortRecommendations_SensorOwnershipId",
+                table: "ComfortRecommendations",
+                column: "SensorOwnershipId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SensorData_ChipId_CreatedAt",
@@ -265,10 +281,10 @@ namespace MySensorApi.Migrations
                 name: "ComfortRecommendations");
 
             migrationBuilder.DropTable(
-                name: "SensorData");
+                name: "SettingsUserAdjustments");
 
             migrationBuilder.DropTable(
-                name: "SettingsUserAdjustments");
+                name: "SensorData");
 
             migrationBuilder.DropTable(
                 name: "SensorOwnerships");

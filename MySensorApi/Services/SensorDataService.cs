@@ -1,4 +1,5 @@
-﻿using MySensorApi.DTO.Charts;
+﻿using MySensorApi.DTO;
+using MySensorApi.DTO.Charts;
 using MySensorApi.DTO.SensorData;
 using MySensorApi.Infrastructure.Repositories.Interfaces;
 using MySensorApi.Models;
@@ -11,32 +12,54 @@ namespace MySensorApi.Services
         Task<int> SaveAsync(SensorData data, CancellationToken ct = default);
         Task<SensorDataDto?> GetLatestAsync(string chipId, int? userId, CancellationToken ct = default);
 
-        // Серії для графіків (з опціональними датами — контролер викликає day/week)
+        // Серії для графіків (контролер викликає day/week)
         Task<List<SensorPointDto>> GetSeriesAsync(
             string chipId,
             DateTime? from,
             DateTime? to,
             TimeBucket bucket,
             CancellationToken ct = default);
+        Task<int> SaveAsync(SensorDataInDto dto, CancellationToken ct = default);
     }
 
     public sealed class SensorDataService : ISensorDataService
     {
         private readonly ISensorDataRepository _dataRepo;
         private readonly IOwnershipRepository _ownRepo;
+        private readonly ISettingsService _settings; // ← додали залежність
 
-        public SensorDataService(ISensorDataRepository dataRepo, IOwnershipRepository ownRepo)
+        public SensorDataService(
+            ISensorDataRepository dataRepo,
+            IOwnershipRepository ownRepo,
+            ISettingsService settings)
         {
             _dataRepo = dataRepo;
             _ownRepo = ownRepo;
+            _settings = settings;
         }
 
         public async Task<int> SaveAsync(SensorData data, CancellationToken ct = default)
         {
+            // Нормалізуємо chipId і фіксуємо час на сервері
             data.ChipId = ChipId.Normalize(data.ChipId);
             data.CreatedAt = DateTime.UtcNow;
+
             await _dataRepo.AddAsync(data, ct);
-            return await _dataRepo.SaveChangesAsync(ct);
+            var affected = await _dataRepo.SaveChangesAsync(ct); // тут EF проставить data.Id
+
+            // 1 вимір → 1 рекомендація (делегуємо в SettingsService)
+            try
+            {
+                // Метод сам гарантує унікальність по SensorDataId
+                await _settings.SaveAdviceForMeasurementAsync(data, ct);
+            }
+            catch
+            {
+                // Не блокуємо прийом телеметрії через помилки рекомендацій.
+                // (за бажанням додай ILogger і залогуй)
+            }
+
+            return affected;
         }
 
         public async Task<SensorDataDto?> GetLatestAsync(string chipId, int? userId, CancellationToken ct = default)
@@ -84,5 +107,28 @@ namespace MySensorApi.Services
             LightAnalog = s.LightAnalog,
             LightAnalogPercent = s.LightAnalogPercent
         };
+
+        public async Task<int> SaveAsync(SensorDataInDto dto, CancellationToken ct = default)
+        {
+            var entity = new SensorData
+            {
+                ChipId = ChipId.Normalize(dto.ChipId),
+                TemperatureDht = dto.TemperatureDht,
+                HumidityDht = dto.HumidityDht,
+                TemperatureBme = dto.TemperatureBme,
+                HumidityBme = dto.HumidityBme,
+                Pressure = dto.Pressure,
+                Altitude = dto.Altitude,
+                GasDetected = dto.GasDetected,
+                Light = dto.Light,
+                Mq2Analog = dto.MQ2Analog,
+                Mq2AnalogPercent = dto.MQ2AnalogPercent,
+                LightAnalog = dto.LightAnalog,
+                LightAnalogPercent = dto.LightAnalogPercent,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            return await SaveAsync(entity, ct);
+        }
     }
 }

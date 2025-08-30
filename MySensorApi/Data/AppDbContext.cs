@@ -25,7 +25,7 @@ namespace MySensorApi.Data
                 .HasOne(u => u.Role)
                 .WithMany(r => r.Users)
                 .HasForeignKey(u => u.RoleId)
-                .OnDelete(DeleteBehavior.NoAction); // 🚫 без каскаду
+                .OnDelete(DeleteBehavior.NoAction);
 
             modelBuilder.Entity<User>()
                 .Property(u => u.Username).HasMaxLength(50).IsRequired();
@@ -52,7 +52,7 @@ namespace MySensorApi.Data
                 .HasOne(so => so.User)
                 .WithMany(u => u.SensorOwnerships)
                 .HasForeignKey(so => so.UserId)
-                .OnDelete(DeleteBehavior.NoAction); // 🚫 щоб уникнути циклів
+                .OnDelete(DeleteBehavior.NoAction);
 
             modelBuilder.Entity<SensorOwnership>()
                 .Property(so => so.ChipId).HasMaxLength(32).IsRequired();
@@ -97,19 +97,19 @@ namespace MySensorApi.Data
                 .HasOne(adjust => adjust.User)
                 .WithMany()
                 .HasForeignKey(adjust => adjust.UserId)
-                .OnDelete(DeleteBehavior.NoAction); // 🚫
+                .OnDelete(DeleteBehavior.NoAction);
 
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .HasOne(adjust => adjust.Setting)
                 .WithMany(setting => setting.Adjustments)
                 .HasForeignKey(adjust => adjust.SettingId)
-                .OnDelete(DeleteBehavior.NoAction); // 🚫
+                .OnDelete(DeleteBehavior.NoAction);
 
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .HasOne(a => a.SensorOwnership)
                 .WithMany()
                 .HasForeignKey(a => a.SensorOwnershipId)
-                .OnDelete(DeleteBehavior.Cascade); // ✅ логічно: кімната → її поправки
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<SettingsUserAdjustment>()
                 .Property(a => a.CreatedAt)
@@ -127,14 +127,21 @@ namespace MySensorApi.Data
                 .HasOne(c => c.SensorOwnership)
                 .WithMany()
                 .HasForeignKey(c => c.SensorOwnershipId)
-                .OnDelete(DeleteBehavior.Cascade); // ✅ логічно: кімната → її рекомендації
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ComfortRecommendation>()
+                .HasOne(c => c.SensorData)
+                .WithOne(d => d.ComfortRecommendation)
+                .HasForeignKey<ComfortRecommendation>(c => c.SensorDataId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ComfortRecommendation>()
+                .HasIndex(c => c.SensorDataId)
+                .IsUnique();
 
             modelBuilder.Entity<ComfortRecommendation>()
                 .Property(c => c.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");
-
-            modelBuilder.Entity<ComfortRecommendation>()
-                .HasIndex(c => new { c.SensorOwnershipId, c.CreatedAt });
 
             // ------------------ Seed Settings ------------------
             modelBuilder.Entity<Setting>().HasData(

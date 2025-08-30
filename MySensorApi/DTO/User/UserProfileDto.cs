@@ -12,6 +12,12 @@ namespace MySensorApi.DTO
 
         public string RoleName { get; set; } = "User";
 
+        // 🔹 Версії та таймстемпи для зміни username
+        public int Version { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+
+        // 🔹 Токени (ігноруємо при GET профілю, але повертаємо при login/refresh)
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? AccessToken { get; set; }
 

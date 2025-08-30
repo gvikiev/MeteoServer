@@ -17,5 +17,6 @@
         public int? LightAnalog { get; set; }
         public float? LightAnalogPercent { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public ComfortRecommendation? ComfortRecommendation { get; set; }
     }
 }

@@ -15,6 +15,7 @@ namespace MySensorApi.Infrastructure.Repositories.Interfaces
 
         Task AddAsync(User user, CancellationToken ct = default);
         Task<int> SaveChangesAsync(CancellationToken ct = default);
+        Task<bool> UsernameExistsForOtherAsync(string username, int excludeUserId, CancellationToken ct = default);
 
     }
 }

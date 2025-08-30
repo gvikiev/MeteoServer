@@ -10,23 +10,47 @@ namespace MySensorApi.Infrastructure.Repositories
         private readonly AppDbContext _db;
         public SettingsRepository(AppDbContext db) => _db = db;
 
+        // Базові налаштування (температура/вологість/газ)
         public Task<List<Setting>> GetAllAsync(CancellationToken ct = default) =>
             _db.Settings.AsNoTracking().ToListAsync(ct);
 
-        public Task<List<ComfortRecommendation>> GetAdviceHistoryAsync(string chipId, int take, CancellationToken ct = default) =>
-            _db.ComfortRecommendations
-               .AsNoTracking()
-               .Where(r => r.SensorOwnership.ChipId == chipId)
-               .OrderByDescending(r => r.CreatedAt)
-               .Take(Math.Clamp(take, 1, 200))
-               .ToListAsync(ct);
+        // Історія рекомендацій по чипу (останні 7 днів, ліміт)
+        public Task<List<ComfortRecommendation>> GetAdviceHistoryAsync(
+            string chipId, int take, CancellationToken ct = default)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-7);
 
+            return _db.ComfortRecommendations
+                      .AsNoTracking()
+                      .Where(r => r.SensorOwnership.ChipId == chipId &&
+                                  r.CreatedAt >= cutoff)
+                      .OrderByDescending(r => r.CreatedAt)
+                      .Take(Math.Clamp(take, 1, 200))
+                      .ToListAsync(ct);
+        }
+
+        // Додати рекомендацію (і "все в нормі" теж)
         public Task AddAdviceAsync(ComfortRecommendation rec, CancellationToken ct = default) =>
             _db.ComfortRecommendations.AddAsync(rec, ct).AsTask();
+
+        // 🔒 1 вимір → 1 рекомендація
+        public Task<ComfortRecommendation?> FindAdviceBySensorDataIdAsync(int sensorDataId, CancellationToken ct = default) =>
+            _db.ComfortRecommendations
+               .AsNoTracking()
+               .FirstOrDefaultAsync(r => r.SensorDataId == sensorDataId, ct);
+
+        // Остання рекомендація по кімнаті (може знадобитись)
+        public Task<ComfortRecommendation?> GetLastAdviceForOwnershipAsync(int ownershipId, CancellationToken ct = default) =>
+            _db.ComfortRecommendations
+               .AsNoTracking()
+               .Where(r => r.SensorOwnershipId == ownershipId)
+               .OrderByDescending(r => r.CreatedAt)
+               .FirstOrDefaultAsync(ct);
 
         public Task SaveChangesAsync(CancellationToken ct = default) =>
             _db.SaveChangesAsync(ct);
 
+        // Upsert юзерських поправок до базових налаштувань
         public async Task UpsertAdjustmentAsync(SettingsUserAdjustment adj, CancellationToken ct = default)
         {
             var existing = await _db.SettingsUserAdjustments
@@ -39,8 +63,9 @@ namespace MySensorApi.Infrastructure.Repositories
             {
                 existing.LowValueAdjustment = adj.LowValueAdjustment;
                 existing.HighValueAdjustment = adj.HighValueAdjustment;
-                existing.Version += 1;
+                existing.Version = existing.Version + 1;
                 existing.UpdatedAt = DateTime.UtcNow;
+
                 _db.SettingsUserAdjustments.Update(existing);
             }
             else
@@ -48,6 +73,7 @@ namespace MySensorApi.Infrastructure.Repositories
                 adj.Version = 1;
                 adj.CreatedAt = DateTime.UtcNow;
                 adj.UpdatedAt = DateTime.UtcNow;
+
                 await _db.SettingsUserAdjustments.AddAsync(adj, ct);
             }
         }
@@ -60,6 +86,5 @@ namespace MySensorApi.Infrastructure.Repositories
                            a.SensorOwnershipId == ownershipId &&
                            settingIds.Contains(a.SettingId))
                .ToListAsync(ct);
-
     }
 }

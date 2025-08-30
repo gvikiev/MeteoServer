@@ -12,8 +12,8 @@ using MySensorApi.Data;
 namespace MySensorApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250829102730_Clean")]
-    partial class Clean
+    [Migration("20250830210816_FinalMaybe")]
+    partial class FinalMaybe
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -42,12 +42,19 @@ namespace MySensorApi.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("SensorDataId")
+                        .HasColumnType("int");
+
                     b.Property<int>("SensorOwnershipId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SensorOwnershipId", "CreatedAt");
+                    b.HasIndex("SensorDataId")
+                        .IsUnique()
+                        .HasFilter("[SensorDataId] IS NOT NULL");
+
+                    b.HasIndex("SensorOwnershipId");
 
                     b.ToTable("ComfortRecommendations");
                 });
@@ -326,10 +333,16 @@ namespace MySensorApi.Migrations
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -343,11 +356,18 @@ namespace MySensorApi.Migrations
 
             modelBuilder.Entity("MySensorApi.Models.ComfortRecommendation", b =>
                 {
+                    b.HasOne("MySensorApi.Models.SensorData", "SensorData")
+                        .WithOne("ComfortRecommendation")
+                        .HasForeignKey("MySensorApi.Models.ComfortRecommendation", "SensorDataId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("MySensorApi.Models.SensorOwnership", "SensorOwnership")
                         .WithMany()
                         .HasForeignKey("SensorOwnershipId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("SensorData");
 
                     b.Navigation("SensorOwnership");
                 });
@@ -403,6 +423,11 @@ namespace MySensorApi.Migrations
             modelBuilder.Entity("MySensorApi.Models.Role", b =>
                 {
                     b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("MySensorApi.Models.SensorData", b =>
+                {
+                    b.Navigation("ComfortRecommendation");
                 });
 
             modelBuilder.Entity("MySensorApi.Models.Setting", b =>
