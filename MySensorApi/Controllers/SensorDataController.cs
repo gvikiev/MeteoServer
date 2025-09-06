@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MySensorApi.DTO;                // <-- додано: тут живе SensorOwnershipDto
 using MySensorApi.DTO.Charts;
 using MySensorApi.DTO.SensorData;

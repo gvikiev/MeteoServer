@@ -1,12 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MySensorApi.DTO;
 using MySensorApi.Services;
 
 namespace MySensorApi.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class DisplayDataController : ControllerBase
+    public class DisplayDataController : BaseController
     {
         private readonly IOwnershipService _ownership;
 
@@ -16,11 +18,10 @@ namespace MySensorApi.Controllers
         }
 
         // Усі кімнати користувача
-        [HttpGet("byUser/{userId}")]
-        public async Task<ActionResult<IEnumerable<RoomWithSensorDto>>> GetRoomsByUserId(
-            int userId, CancellationToken ct)
+        [HttpGet("byUser")]
+        public async Task<ActionResult<IEnumerable<RoomWithSensorDto>>> GetRoomsByUserId( CancellationToken ct)
         {
-            var items = await _ownership.GetRoomsByUserAsync(userId, ct);
+            var items = await _ownership.GetRoomsByUserAsync(CurrentUser.Id, ct);
             return Ok(items);
         }
 
